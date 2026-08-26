@@ -9,4 +9,11 @@ Pharmacoepidemiology offers a unique perspective for defining and analyzing the 
 
 Here you can find teaching materials for the GIS module of the **ISPE 2026 pre-conference skill course**, *"Introduction to GIS Methods for Environmental Pharmacoepidemiology."* This module is a hands-on R exercise: attendees take real CDC surveillance tables and build a small but complete GIS workflow, attribute joins, choropleth maps, and small-multiples panels across years and seasons, while learning to watch for the specific ways area-level analysis can mislead you in this field (MAUP, ecological fallacy, surveillance-effort bias).
 
+| Path | What it is |
+|---|---|
+| `exercises/GIS_Intro_Exercise_EnvPharmacoepi.Rmd` | The student-facing R Markdown exercise. Knit to HTML or work through it chunk by chunk. |
+| `instructor/ANSWER-KEY.Rmd` | Worked solutions for the independent-practice section (Part 8). **Contains spoilers** — see the note below. |
+| `slides/GIS_Slides_EnvPharmacoepi.qmd` | Quarto (`revealjs`) slide-deck version of the same material, for the lecture portion of the session. |
+| `data/` | The three CDC datasets used throughout, plus `DATA_SOURCES.md` documenting where each one came from. |
+
 More advanced methods such as spatial autocorrelation methods (Moran's I / LISA clustering) are intentionally **not** covered in this module — see [Where to go next](#where-to-go-next).
