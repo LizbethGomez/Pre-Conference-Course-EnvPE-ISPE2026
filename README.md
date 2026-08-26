@@ -1,8 +1,8 @@
 # Pre-Conference-Course-EnvPE-ISPE2026
 Welcome to the ISPE 2026 Environmental Pharmacoepidemiology: Overview, Methods, and Applications pre conference skill course.
 
-**INFO**: Saturday, August 29, 2026  9:00 AM - 12:30 PM CEST  Location: Brown 3, Level 2
-#----
+**INFO**: Saturday, August 29, 2026  9:00 AM - 12:30 PM CEST  Location: Brown 3, Level 2.
+
 The access, use, effectiveness, safety and adherence of medical products (e.g., drugs, devices, and vaccines) do not occur in isolation. They are embedded in broader environmental, social, and systemic contexts that influence both individual behavior and health system performance . These contexts are undergoing significant disruptions, drive by increasing intensity and frequency of extreme temperature and weather events.
 
 Pharmacoepidemiology offers a unique perspective for defining and analyzing the environmental impacts on medicines and evaluating the social and economic consequences of mitigation and adaptation strategies as they relate to drug access, use, safety, and effectiveness. Environmental pharmacoepidemiology extends traditional pharmacoepidemiologic approaches by incorporating environmental exposures, spatial and temporal contexts, and community-engaged approaches to improve the access, use, safety, and effectiveness of medical products and health outcomes, particularly as environmental factors increasingly interact with medications to influence health outcomes. This course addresses pressing public health challenges at the intersection of environmental science and pharmacoepidemiology, introducing extended large-data pharmacoepidemiologic methods including geospatial data and analytics alongside qualitative and community engagement methods and their applications in environmental pharmacoepidemiology
