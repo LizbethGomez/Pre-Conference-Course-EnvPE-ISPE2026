@@ -7,16 +7,6 @@ The access, use, effectiveness, safety and adherence of medical products (e.g., 
 
 Pharmacoepidemiology offers a unique perspective for defining and analyzing the environmental impacts on medicines and evaluating the social and economic consequences of mitigation and adaptation strategies as they relate to drug access, use, safety, and effectiveness. Environmental pharmacoepidemiology extends traditional pharmacoepidemiologic approaches by incorporating environmental exposures, spatial and temporal contexts, and community-engaged approaches to improve the access, use, safety, and effectiveness of medical products and health outcomes, particularly as environmental factors increasingly interact with medications to influence health outcomes. This course addresses pressing public health challenges at the intersection of environmental science and pharmacoepidemiology, introducing extended large-data pharmacoepidemiologic methods including geospatial data and analytics alongside qualitative and community engagement methods and their applications in environmental pharmacoepidemiology
 
-# GIS for Environmental Pharmacoepidemiology
+Here you can find teaching materials for the GIS module of the **ISPE 2026 pre-conference skill course**, *"Introduction to GIS Methods for Environmental Pharmacoepidemiology."* This module is a hands-on R exercise: attendees take real CDC surveillance tables and build a small but complete GIS workflow, attribute joins, choropleth maps, and small-multiples panels across years and seasons, while learning to watch for the specific ways area-level analysis can mislead you in this field (MAUP, ecological fallacy, surveillance-effort bias).
 
-Teaching materials for the GIS module of the **ISPE 2026 pre-conference
-skill course**, *"Introduction to GIS Methods for Environmental
-Pharmacoepidemiology."* This module is a hands-on R exercise: attendees
-take real CDC surveillance tables and build a small but complete GIS workflow, attribute joins,
-choropleth maps, and small-multiples panels across years and seasons, 
-while learning to watch for the specific ways area-level analysis can
-mislead you in this field (MAUP, ecological fallacy, surveillance-effort
-bias).
-
-More advanced methods such as spatial autocorrelation methods (Moran's I / LISA clustering) are
-intentionally **not** covered in this module — see [Where to go next](#where-to-go-next).
+More advanced methods such as spatial autocorrelation methods (Moran's I / LISA clustering) are intentionally **not** covered in this module — see [Where to go next](#where-to-go-next).
