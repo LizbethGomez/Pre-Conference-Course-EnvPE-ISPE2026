@@ -1,8 +1,4 @@
----
 
-editor_options: 
-  markdown: 
-    wrap: 72
 ---
 
 # Pre-Conference-Course-EnvPE-ISPE2026
