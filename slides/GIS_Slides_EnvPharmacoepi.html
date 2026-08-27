@@ -9,6 +9,7 @@
 <link href="GIS_Slides_EnvPharmacoepi_files/libs/quarto-html/quarto-syntax-highlighting-15634bcf2e68342d4ad2dfa704d543f6.css" rel="stylesheet" id="quarto-text-highlighting-styles"><meta charset="utf-8">
   <meta name="generator" content="quarto-1.9.38">
 
+  <meta name="author" content="ISPE 2026 Pre-Conference Course">
   <title>Mapping Antimicrobial Resistance Across U.S. States</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -97,7 +98,7 @@
     code span.vs { color: #20794d; } /* VerbatimString */
     code span.wa { color: #5e5e5e; font-style: italic; } /* Warning */
   </style>
-  <link rel="stylesheet" href="GIS_Slides_EnvPharmacoepi_files/libs/revealjs/dist/theme/quarto-2740581606dc327e82f18f789b69d8a0.css">
+  <link rel="stylesheet" href="GIS_Slides_EnvPharmacoepi_files/libs/revealjs/dist/theme/quarto-0427d8d92a431aa6a6430e53ec02a470.css">
   <link href="GIS_Slides_EnvPharmacoepi_files/libs/revealjs/plugin/quarto-line-highlight/line-highlight.css" rel="stylesheet">
   <link href="GIS_Slides_EnvPharmacoepi_files/libs/revealjs/plugin/reveal-menu/menu.css" rel="stylesheet">
   <link href="GIS_Slides_EnvPharmacoepi_files/libs/revealjs/plugin/reveal-menu/quarto-menu.css" rel="stylesheet">
@@ -113,6 +114,7 @@
     }
     .reveal .slide:not(.center) {
       height: 100%;
+      overflow-y: auto;
     }
     .reveal .slide.scrollable {
       overflow-y: auto;
@@ -196,33 +198,55 @@
 
 <section id="title-slide" class="quarto-title-block center">
   <h1 class="title">Mapping Antimicrobial Resistance Across U.S. States</h1>
+  <p class="subtitle">An Introduction to GIS Methods for Environmental Pharmacoepidemiology</p>
 
 <div class="quarto-title-authors">
+<div class="quarto-title-author">
+<div class="quarto-title-author-name">
+ISPE 2026 Pre-Conference Course 
+</div>
+</div>
 </div>
 
 </section>
 <section>
 <section id="welcome" class="title-slide slide level1 center">
 <h1>Welcome</h1>
-<p>We are going to build a small but complete GIS workflow in R, using real CDC surveillance data:</p>
-<ol type="1">
-<li><strong><code>ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv</code></strong> — the percent of multidrug-resistant (MDR) <em>E. coli</em> isolates among healthcare-associated infections, by state, from CDC’s Antibiotic Resistance &amp; Patient Safety Portal (ARPSP), 2024.</li>
-<li><strong><code>BEAM_Dashboard_-_Report_Data_20260804.csv</code></strong> — CDC enteric bacteria surveillance isolates (Salmonella, <em>E. coli</em>/STEC, Campylobacter, Shigella, Vibrio) drawn from animal, food, human, and <strong>environmental</strong> sources, reported monthly since 2018. We will use the environmental-source <em>Salmonella</em> records as a proxy <strong>exposure / surveillance-effort</strong>.</li>
-<li><strong><code>2024-SIR-ACH.xlsx</code></strong> — CDC NHSN Standardized Infection Ratio (SIR) report for acute care hospitals, 2024. You will use this yourself in Part 8.</li>
-</ol>
-<p>None of these files contain a shapefile, a latitude, or a longitude. That is deliberate. Most pharmacoepidemiology environmental exposure data you will encounter in practice — surveillance reports, claims data aggregated for privacy, vital statistics — arrives as <strong>tables tied to an administrative area</strong> (state, county, ZIP) <strong>and to a time period</strong> (month, year).</p>
+
 </section>
-<section id="learning-objectives" class="slide level2">
-<h2>Learning objectives</h2>
-<p>By the end, you will be able to:</p>
+<section id="datasets" class="slide level2">
+<h2>Datasets</h2>
+<p>Open source CDC surveillance data.</p>
+<p>No shapefile, no lat/long provided.</p>
 <ul>
-<li>Import and clean real, messy public-health surveillance data in R</li>
-<li>Obtain U.S. state boundary polygons and understand what a coordinate reference system (CRS) is doing for you</li>
-<li>Perform an <strong>attribute join</strong> — attaching non-spatial data to spatial geometry by a shared key — the single most common GIS operation you will do in this field</li>
-<li>Build choropleth (thematic) maps with <code>ggplot2</code> + <code>sf</code></li>
-<li>Build <strong>small-multiples map panels</strong> to show how a distribution changes across years and across seasons, and understand why the color scale has to be shared across panels for the comparison to be fair</li>
-<li>Recognize <strong>seasonality</strong> in area-level surveillance data using both a simple distribution plot and a mapped version of the same pattern</li>
-<li>Name the specific ways area-level GIS analysis can mislead you in environmental pharmacoepidemiology (MAUP, ecological fallacy, surveillance effort bias) — and recognize them in your own results</li>
+<li><code>ARPSP_...csv</code> — MDR <em>E. coli</em> resistance among HAIs, by state, 2024 → <strong>clinical outcome</strong></li>
+<li><code>BEAM_Dashboard_...csv</code> — enteric pathogen isolates, by state, month, and source (animal/food/human/<strong>environmental</strong>), 2018– → <strong>exposure / surveillance-effort</strong></li>
+<li><code>2024-SIR-ACH.xlsx</code> — NHSN hospital SIR report, 2024 → used in the independent-practice section</li>
+</ul>
+<aside class="notes">
+<p>Emphasize: most real-world exposure data in this field arrives as tables tied to an area + a time period, not points on a map.</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
+</section>
+<section id="learning-objectives" class="slide level2 smaller">
+<h2>Learning objectives</h2>
+<ul>
+<li>Import and clean messy public-health surveillance data</li>
+<li>Get U.S. state polygons; understand what a CRS is doing for you</li>
+<li>The <strong>attribute join</strong> — non-spatial table → spatial geometry</li>
+<li>Choropleth mapping with <code>ggplot2</code> + <code>sf</code></li>
+<li><strong>Small-multiples panels</strong> across years and seasons — and why the color scale must be shared</li>
+<li>Reading <strong>seasonality</strong> in area-level data</li>
+<li>Understanding how area-level analysis misclassification may impact your results : <strong>MAUP</strong>, <strong>ecological fallacy</strong>, <strong>surveillance-effort bias</strong></li>
 </ul>
 </section>
 <section class="slide level2">
@@ -231,49 +255,41 @@
 <section>
 <section id="setup" class="title-slide slide level1 center">
 <h1>Setup</h1>
+
+</section>
+<section id="packages" class="slide level2 smaller">
+<h2>Packages</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href=""></a><span class="co"># Run once. Skip if already installed.</span></span>
-<span id="cb1-2"><a href=""></a><span class="fu">install.packages</span>(<span class="fu">c</span>(<span class="st">"sf"</span>, <span class="st">"tigris"</span>, <span class="st">"dplyr"</span>, <span class="st">"tidyr"</span>, <span class="st">"readr"</span>, <span class="st">"readxl"</span>,</span>
-<span id="cb1-3"><a href=""></a>                    <span class="st">"janitor"</span>, <span class="st">"ggplot2"</span>, <span class="st">"viridis"</span>, <span class="st">"scales"</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href=""></a><span class="fu">library</span>(sf)        <span class="co"># spatial vector data: geometry + attributes</span></span>
-<span id="cb2-2"><a href=""></a><span class="fu">library</span>(tigris)     <span class="co"># download US Census boundary files</span></span>
-<span id="cb2-3"><a href=""></a><span class="fu">library</span>(dplyr)       <span class="co"># data wrangling</span></span>
-<span id="cb2-4"><a href=""></a><span class="fu">library</span>(tidyr)         <span class="co"># expand_grid(), for building complete state x time panels</span></span>
-<span id="cb2-5"><a href=""></a><span class="fu">library</span>(readr)          <span class="co"># fast, sane CSV reading</span></span>
-<span id="cb2-6"><a href=""></a><span class="fu">library</span>(readxl)           <span class="co"># read Excel sheets</span></span>
-<span id="cb2-7"><a href=""></a><span class="fu">library</span>(janitor)           <span class="co"># clean up ugly column names</span></span>
-<span id="cb2-8"><a href=""></a><span class="fu">library</span>(ggplot2)             <span class="co"># mapping and plotting</span></span>
-<span id="cb2-9"><a href=""></a><span class="fu">library</span>(viridis)               <span class="co"># colorblind-safe palettes</span></span>
-<span id="cb2-10"><a href=""></a><span class="fu">library</span>(scales)                  <span class="co"># nicer plot labels</span></span>
-<span id="cb2-11"><a href=""></a></span>
-<span id="cb2-12"><a href=""></a><span class="fu">options</span>(<span class="at">tigris_use_cache =</span> <span class="cn">TRUE</span>)   <span class="co"># cache downloaded shapefiles locally</span></span>
-<span id="cb2-13"><a href=""></a>sf<span class="sc">::</span><span class="fu">sf_use_s2</span>(<span class="cn">TRUE</span>)                 <span class="co"># spherical geometry engine (default, just being explicit)</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(sf); <span class="fu">library</span>(tigris); <span class="fu">library</span>(dplyr); <span class="fu">library</span>(tidyr)</span>
+<span id="cb1-2"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(readr); <span class="fu">library</span>(readxl); <span class="fu">library</span>(janitor)</span>
+<span id="cb1-3"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(ggplot2); <span class="fu">library</span>(viridis); <span class="fu">library</span>(scales)</span>
+<span id="cb1-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">tigris_use_cache =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb1-6"><a href="" aria-hidden="true" tabindex="-1"></a>sf<span class="sc">::</span><span class="fu">sf_use_s2</span>(<span class="cn">TRUE</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
 <blockquote>
-<p><strong>Teaching note:</strong> <code>tigris</code> downloads boundary files from the U.S. Census Bureau the first time you use them, then caches them on disk. If you are offline, ask your instructor for the pre-downloaded <code>states_sf.rds</code> file and load it with <code>states_sf &lt;- readRDS("states_sf.rds")</code> instead of running the <code>tigris::states()</code> call below.</p>
+<p><code>tigris</code> downloads state boundaries once, then caches.</p>
+<p>No internet?</p>
+<p>Use the offline <code>cb_2025_us_state_20m</code> shapefile instead (see instructor note).</p>
 </blockquote>
 </section>
 <section class="slide level2">
 
 </section></section>
 <section>
-<section id="part-1-import-and-clean-the-tabular-data" class="title-slide slide level1 center">
-<h1>Part 1 — Import and clean the tabular data</h1>
+<section id="part-1-import-clean" class="title-slide slide level1 center">
+<h1>Part 1 — Import &amp; clean</h1>
 
 </section>
-<section id="a.-clinical-outcome-mdr-e.-coli-resistance-by-state" class="slide level2">
-<h2>1a. Clinical outcome: MDR <em>E. coli</em> resistance by state</h2>
+<section id="a.-clinical-outcome-mdr-e.-coli" class="slide level2 smaller">
+<h2>1a. Clinical outcome: MDR <em>E. coli</em></h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb3"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href=""></a>ecoli_raw <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">"../data/ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv"</span>)</span>
-<span id="cb3-2"><a href=""></a></span>
-<span id="cb3-3"><a href=""></a>ecoli <span class="ot">&lt;-</span> ecoli_raw <span class="sc">%&gt;%</span></span>
-<span id="cb3-4"><a href=""></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span>                 <span class="co"># tidies "Percent Resistant" -&gt; percent_resistant</span></span>
-<span id="cb3-5"><a href=""></a>  <span class="fu">select</span>(state, percent_resistant) <span class="sc">%&gt;%</span></span>
-<span id="cb3-6"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">percent_resistant =</span> <span class="fu">as.numeric</span>(percent_resistant))</span>
-<span id="cb3-7"><a href=""></a></span>
-<span id="cb3-8"><a href=""></a><span class="fu">glimpse</span>(ecoli)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="" aria-hidden="true" tabindex="-1"></a>ecoli <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(<span class="st">"../data/ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb2-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb2-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(state, percent_resistant) <span class="sc">%&gt;%</span></span>
+<span id="cb2-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">percent_resistant =</span> <span class="fu">as.numeric</span>(percent_resistant))</span>
+<span id="cb2-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">glimpse</span>(ecoli)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Rows: 52
 Columns: 2
@@ -281,102 +297,78 @@ $ state             &lt;chr&gt; "Alaska", "Alabama", "Arkansas", "Arizona", "Cal
 $ percent_resistant &lt;dbl&gt; 3.4, 8.3, 10.8, 8.8, 17.3, 9.0, 14.4, 19.7, 10.5, 11…</code></pre>
 </div>
 </div>
-<p><strong>Stop and look.</strong> How many rows do you have? Is that one row per U.S. state? (Hint: <code>nrow(ecoli)</code>; check whether Puerto Rico and DC are included with <code>unique(ecoli$state)</code>.) Knowing your unit of observation <em>before</em> you map it is a GIS habit, as it will help you determine what your eventual polygon layer needs to contain.</p>
+<aside class="notes">
+<p><strong>Ask the room:</strong> how many rows? One per state? Where are PR / DC?</p>
+<style type="text/css">
+        span.MJX_Assistive_MathML {
+          position:absolute!important;
+          clip: rect(1px, 1px, 1px, 1px);
+          padding: 1px 0 0 0!important;
+          border: 0!important;
+          height: 1px!important;
+          width: 1px!important;
+          overflow: hidden!important;
+          display:block!important;
+      }</style></aside>
 </section>
-<section id="b.-environmental-exposure-signal-beam-environmental-isolates-by-state" class="slide level2">
-<h2>1b. Environmental exposure signal: BEAM environmental isolates by state</h2>
-<p>The raw BEAM file is semicolon-delimited and has a European-style thousands separator in the <code>Year</code> column (e.g.&nbsp;<code>"2,024"</code>). This is completely typical of real surveillance exports.</p>
+<section id="b.-environmental-signal-beam" class="slide level2 smaller">
+<h2>1b. Environmental signal: BEAM</h2>
+<p>Semicolon-delimited; <code>Year</code> has thousands-separator commas — typical of real exports.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href=""></a>beam_raw <span class="ot">&lt;-</span> <span class="fu">read_delim</span>(<span class="st">"../data/BEAM_Dashboard_-_Report_Data_20260804.csv"</span>,</span>
-<span id="cb5-2"><a href=""></a>                        <span class="at">delim =</span> <span class="st">";"</span>, <span class="at">show_col_types =</span> <span class="cn">FALSE</span>)</span>
-<span id="cb5-3"><a href=""></a></span>
-<span id="cb5-4"><a href=""></a>beam <span class="ot">&lt;-</span> beam_raw <span class="sc">%&gt;%</span></span>
-<span id="cb5-5"><a href=""></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb5-6"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">gsub</span>(<span class="st">","</span>, <span class="st">""</span>, year)))</span>
-<span id="cb5-7"><a href=""></a></span>
-<span id="cb5-8"><a href=""></a><span class="co"># Keep only environmental-source Salmonella isolates from 2024, as a</span></span>
-<span id="cb5-9"><a href=""></a><span class="co"># first, simple look -- one state, one year, one map.</span></span>
-<span id="cb5-10"><a href=""></a>beam_env_2024 <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb5-11"><a href=""></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2024</span>, source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>)</span>
-<span id="cb5-12"><a href=""></a></span>
-<span id="cb5-13"><a href=""></a><span class="co"># The "state" column has some junk values in it (data-entry artifacts like</span></span>
-<span id="cb5-14"><a href=""></a><span class="co"># "N/", "US", "OU"). A real GIS key needs to be *valid* before you can join</span></span>
-<span id="cb5-15"><a href=""></a><span class="co"># on it -- always sanity-check your join key.</span></span>
-<span id="cb5-16"><a href=""></a>valid_state_codes <span class="ot">&lt;-</span> <span class="fu">c</span>(state.abb, <span class="st">"DC"</span>)   <span class="co"># state.abb is a built-in R constant</span></span>
-<span id="cb5-17"><a href=""></a><span class="fu">sort</span>(<span class="fu">unique</span>(beam_env_2024<span class="sc">$</span>state))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code> [1] "AZ" "CA" "FL" "GA" "HI" "IL" "IN" "MA" "MN" "NC" "NV" "NY" "OH" "PA" "TN"
-[16] "TX" "UT" "VA" "VT" "WA" "WI"</code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="" aria-hidden="true" tabindex="-1"></a>beam <span class="ot">&lt;-</span> <span class="fu">read_delim</span>(<span class="st">"../data/BEAM_Dashboard_-_Report_Data_20260804.csv"</span>,</span>
+<span id="cb4-2"><a href="" aria-hidden="true" tabindex="-1"></a>                    <span class="at">delim =</span> <span class="st">";"</span>, <span class="at">show_col_types =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb4-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">as.numeric</span>(<span class="fu">gsub</span>(<span class="st">","</span>, <span class="st">""</span>, year)))</span>
+<span id="cb4-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-6"><a href="" aria-hidden="true" tabindex="-1"></a>valid_state_codes <span class="ot">&lt;-</span> <span class="fu">c</span>(state.abb, <span class="st">"DC"</span>)</span>
+<span id="cb4-7"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-8"><a href="" aria-hidden="true" tabindex="-1"></a>beam_env_clean <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
+<span id="cb4-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(year <span class="sc">==</span> <span class="dv">2024</span>, source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
+<span id="cb4-10"><a href="" aria-hidden="true" tabindex="-1"></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb4-11"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
+<span id="cb4-12"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">env_isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href=""></a>beam_env_clean <span class="ot">&lt;-</span> beam_env_2024 <span class="sc">%&gt;%</span></span>
-<span id="cb7-2"><a href=""></a>  <span class="fu">filter</span>(state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb7-3"><a href=""></a>  <span class="fu">group_by</span>(state) <span class="sc">%&gt;%</span></span>
-<span id="cb7-4"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">env_isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb7-5"><a href=""></a></span>
-<span id="cb7-6"><a href=""></a>beam_env_clean</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 21 × 2
-   state env_isolates
-   &lt;chr&gt;        &lt;dbl&gt;
- 1 AZ               1
- 2 CA               8
- 3 FL              37
- 4 GA              14
- 5 HI               5
- 6 IL               1
- 7 IN               2
- 8 MA               4
- 9 MN              74
-10 NC              17
-# ℹ 11 more rows</code></pre>
-</div>
-</div>
-<p><strong>Discussion:</strong> Only about 20 states show up here at all, for 2024 alone. Is that because <em>Salmonella</em> genuinely isn’t present in the environment elsewhere — or because those states simply aren’t sampling environmental sources? Hold onto that question; we’ll come back to it, with more data behind us, in Parts 5-7. In environmental pharmacoepidemiology, an “exposure” layer built from surveillance data is never just measuring exposure — it’s also measuring <em>where people looked.</em></p>
+</section>
+<section id="discussion-1b" class="slide level2 smaller">
+<h2>Discussion: 1b</h2>
+<p>Only ~20 states show up here, for 2024 alone.</p>
+<blockquote>
+<p>Is that because <em>Salmonella</em> isn’t in the environment elsewhere — or because those states aren’t sampling it?</p>
+</blockquote>
+<p>An “exposure” layer built from surveillance data always measures exposure <strong>and</strong> <em>where people looked</em>.</p>
 </section>
 <section class="slide level2">
 
 </section></section>
 <section>
-<section id="part-2-get-the-map-state-boundary-polygons" class="title-slide slide level1 center">
-<h1>Part 2 — Get the map: state boundary polygons</h1>
+<section id="part-2-get-the-map" class="title-slide slide level1 center">
+<h1>Part 2 — Get the map</h1>
+
+</section>
+<section id="state-boundary-polygons" class="slide level2">
+<h2>State boundary polygons</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href=""></a>states_sf <span class="ot">&lt;-</span> tigris<span class="sc">::</span><span class="fu">states</span>(<span class="at">cb =</span> <span class="cn">TRUE</span>, <span class="at">resolution =</span> <span class="st">"20m"</span>, <span class="at">year =</span> <span class="dv">2022</span>)</span>
-<span id="cb9-2"><a href=""></a></span>
-<span id="cb9-3"><a href=""></a>states_sf <span class="ot">&lt;-</span> states_sf <span class="sc">%&gt;%</span></span>
-<span id="cb9-4"><a href=""></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb9-5"><a href=""></a>  <span class="fu">select</span>(name, stusps, geoid, geometry)</span>
-<span id="cb9-6"><a href=""></a></span>
-<span id="cb9-7"><a href=""></a><span class="fu">glimpse</span>(states_sf)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Rows: 52
-Columns: 4
-$ name     &lt;chr&gt; "Texas", "California", "Kentucky", "Georgia", "Wisconsin", "O…
-$ stusps   &lt;chr&gt; "TX", "CA", "KY", "GA", "WI", "OR", "MO", "VA", "TN", "LA", "…
-$ geoid    &lt;chr&gt; "48", "06", "21", "13", "55", "41", "29", "51", "47", "22", "…
-$ geometry &lt;MULTIPOLYGON [°]&gt; MULTIPOLYGON (((-106.6234 3..., MULTIPOLYGON (((…</code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="" aria-hidden="true" tabindex="-1"></a>states_sf <span class="ot">&lt;-</span> tigris<span class="sc">::</span><span class="fu">states</span>(<span class="at">cb =</span> <span class="cn">TRUE</span>, <span class="at">resolution =</span> <span class="st">"20m"</span>, <span class="at">year =</span> <span class="dv">2022</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb5-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">clean_names</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb5-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(name, stusps, geoid, geometry)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-</div>
-<p><code>states_sf</code> is an <code>sf</code> object: an ordinary data frame with one extra column, <code>geometry</code>, holding the polygon boundary for each state. Everything you already know about <code>dplyr::filter()</code>, <code>mutate()</code>, and <code>left_join()</code> still works — that is the whole appeal of <code>sf</code>.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href=""></a><span class="fu">ggplot</span>(states_sf) <span class="sc">+</span></span>
-<span id="cb11-2"><a href=""></a>  <span class="fu">geom_sf</span>() <span class="sc">+</span></span>
-<span id="cb11-3"><a href=""></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb11-4"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"U.S. state boundaries (no data joined yet)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(states_sf) <span class="sc">+</span> <span class="fu">geom_sf</span>() <span class="sc">+</span> <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb6-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"U.S. state boundaries (no data joined yet)"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/plot-blank-map-1.png" width="768" class="r-stretch"><p>For the rest of this exercise we’ll restrict to the contiguous 48 states + DC. Alaska, Hawaii, Puerto Rico, and the outlying territories are real and important, but they sit far outside the CONUS bounding box and would either get cut off or force us to shrink every other state to fit them on the same simple map. (<code>tigris::shift_geometry()</code> can reposition them into inset boxes if you need a true all-50-states map later — worth knowing exists, out of scope for today.) For a first pass at small-multiples mapping, keeping the geography simple lets us focus on the actual skill: comparing panels to each other.</p>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/plot-blank-map-1.png" width="720" class="r-stretch"></section>
+<section id="why-conus-only" class="slide level2 smaller">
+<h2>Why CONUS-only?</h2>
+<p>AK / HI / PR sit far outside the CONUS — they’d get cut off or shrink everything else. (<code>tigris::shift_geometry()</code> can inset them later — out of scope today.)</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href=""></a>conus_codes <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">c</span>(state.abb, <span class="st">"DC"</span>), <span class="fu">c</span>(<span class="st">"AK"</span>, <span class="st">"HI"</span>))</span>
-<span id="cb12-2"><a href=""></a></span>
-<span id="cb12-3"><a href=""></a>states_conus <span class="ot">&lt;-</span> states_sf <span class="sc">%&gt;%</span></span>
-<span id="cb12-4"><a href=""></a>  <span class="fu">filter</span>(stusps <span class="sc">%in%</span> conus_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb12-5"><a href=""></a>  <span class="fu">st_transform</span>(<span class="dv">5070</span>)   <span class="co"># Albers Equal Area Conic — standard projected CRS for CONUS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="" aria-hidden="true" tabindex="-1"></a>conus_codes <span class="ot">&lt;-</span> <span class="fu">setdiff</span>(<span class="fu">c</span>(state.abb, <span class="st">"DC"</span>), <span class="fu">c</span>(<span class="st">"AK"</span>, <span class="st">"HI"</span>))</span>
+<span id="cb7-2"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-3"><a href="" aria-hidden="true" tabindex="-1"></a>states_conus <span class="ot">&lt;-</span> states_sf <span class="sc">%&gt;%</span></span>
+<span id="cb7-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(stusps <span class="sc">%in%</span> conus_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb7-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">st_transform</span>(<span class="dv">5070</span>)   <span class="co"># Albers Equal Area — projected CRS for CONUS</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<blockquote>
-<p><strong>CRS check-in.</strong> <code>tigris</code> gives you data in geographic coordinates (NAD83, unprojected — degrees of latitude/longitude). We just projected to EPSG:5070, an <em>equal-area</em> projection built for the contiguous U.S. Projection matters here for two concrete reasons: (1) <code>ggplot2</code> will draw a nicer, less distorted map, and (2) any analysis that depends on area or distance (which ours doesn’t today, but often will) requires a projected CRS to be correct. Always ask “what CRS is this in, and does that CRS make sense for what I’m about to compute?”</p>
-</blockquote>
+<p><strong>Coordinate Reference System</strong> (<strong>CRS) check-in:</strong> <code>tigris</code> gives unprojected NAD83. EPSG:5070 is equal-area, built for CONUS. Always ask: <em>what CRS is this, and does it fit what I’m about to compute?</em></p>
 </section>
 <section class="slide level2">
 
@@ -384,36 +376,27 @@ $ geometry &lt;MULTIPOLYGON [°]&gt; MULTIPOLYGON (((-106.6234 3..., MULTIPOLYGO
 <section>
 <section id="part-3-attribute-join" class="title-slide slide level1 center">
 <h1>Part 3 — Attribute join</h1>
-<p>This is the step that turns a spreadsheet into a map. We attach our two non-spatial tables to <code>states_conus</code> by matching a shared key: full state name for the ARPSP data, two-letter abbreviation for the BEAM data.</p>
+
+</section>
+<section id="attaching-tables-to-geometry" class="slide level2 smaller">
+<h2>Attaching tables to geometry</h2>
+<p>Shared key: full state name (ARPSP) / two-letter code (BEAM).</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href=""></a>map_data <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span></span>
-<span id="cb13-2"><a href=""></a>  <span class="fu">left_join</span>(ecoli, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"name"</span> <span class="ot">=</span> <span class="st">"state"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-3"><a href=""></a>  <span class="fu">left_join</span>(beam_env_clean, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb13-4"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">env_isolates =</span> <span class="fu">coalesce</span>(env_isolates, <span class="dv">0</span>))  <span class="co"># no report = 0 isolates, not missing</span></span>
-<span id="cb13-5"><a href=""></a></span>
-<span id="cb13-6"><a href=""></a><span class="fu">summary</span>(map_data<span class="sc">$</span>percent_resistant)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max.    NA's 
-  0.000   6.850   9.400   9.894  12.825  23.000       1 </code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(ecoli, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"name"</span> <span class="ot">=</span> <span class="st">"state"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(beam_env_clean, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">env_isolates =</span> <span class="fu">coalesce</span>(env_isolates, <span class="dv">0</span>))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href=""></a><span class="fu">summary</span>(map_data<span class="sc">$</span>env_isolates)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
-  0.000   0.000   0.000   6.735   4.000  98.000 </code></pre>
-</div>
-</div>
-<p><strong>Stop and check your join.</strong> A silent join failure — rows that should have matched but didn’t, because of a trailing space, a “St.” vs “Saint”, a different case — is the single most common source of a blank or wrong-looking choropleth map. Before you ever trust a joined map, run:</p>
+<p><strong>Always check your join</strong> before trusting a map:</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href=""></a>map_data <span class="sc">%&gt;%</span></span>
-<span id="cb17-2"><a href=""></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb17-3"><a href=""></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(percent_resistant)) <span class="sc">%&gt;%</span></span>
-<span id="cb17-4"><a href=""></a>  <span class="fu">select</span>(name, stusps)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data <span class="sc">%&gt;%</span> <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb9-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="fu">is.na</span>(percent_resistant)) <span class="sc">%&gt;%</span> <span class="fu">select</span>(name, stusps)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>     name stusps
 1 Wyoming     WY</code></pre>
 </div>
 </div>
-<p>If that returns states you <em>expected</em> to have data, go back and find the mismatch. If it’s empty, your join key worked.</p>
+<p>A silent join failure (trailing space, “St.” vs “Saint”) is the #1 cause of a wrong-looking choropleth.</p>
 </section>
 <section class="slide level2">
 
@@ -421,301 +404,330 @@ $ geometry &lt;MULTIPOLYGON [°]&gt; MULTIPOLYGON (((-106.6234 3..., MULTIPOLYGO
 <section>
 <section id="part-4-your-first-choropleth-maps" class="title-slide slide level1 center">
 <h1>Part 4 — Your first choropleth maps</h1>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href=""></a><span class="fu">ggplot</span>(map_data) <span class="sc">+</span></span>
-<span id="cb19-2"><a href=""></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> percent_resistant), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
-<span id="cb19-3"><a href=""></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"% MDR</span><span class="sc">\n</span><span class="st">E. coli"</span>, <span class="at">option =</span> <span class="st">"magma"</span>, <span class="at">direction =</span> <span class="sc">-</span><span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb19-4"><a href=""></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
-<span id="cb19-5"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Multidrug-resistant E. coli among HAIs, by state, 2024"</span>,</span>
-<span id="cb19-6"><a href=""></a>       <span class="at">subtitle =</span> <span class="st">"CDC Antibiotic Resistance &amp; Patient Safety Portal"</span>,</span>
-<span id="cb19-7"><a href=""></a>       <span class="at">caption =</span> <span class="st">"Source: ARPSP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output-display">
-<div>
-<figure>
-<p><img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/choropleth-ecoli-1.png" width="768"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href=""></a><span class="fu">ggplot</span>(map_data) <span class="sc">+</span></span>
-<span id="cb20-2"><a href=""></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> env_isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
-<span id="cb20-3"><a href=""></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Environmental</span><span class="sc">\n</span><span class="st">Salmonella</span><span class="sc">\n</span><span class="st">isolates"</span>, <span class="at">option =</span> <span class="st">"viridis"</span>) <span class="sc">+</span></span>
-<span id="cb20-4"><a href=""></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
-<span id="cb20-5"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmentally-sourced Salmonella isolates, by state, 2024"</span>,</span>
-<span id="cb20-6"><a href=""></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
-<span id="cb20-7"><a href=""></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output-display">
-<div>
-<figure>
-<p><img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/choropleth-beam-1.png" width="768"></p>
-</figure>
-</div>
-</div>
-</div>
-<p><strong>Discussion prompts:</strong></p>
-<ol type="1">
-<li><code>scale_fill_viridis_c()</code> uses a <em>continuous</em> color gradient. What would change if you binned this into 4-5 categories instead (<code>scale_fill_viridis_b()</code>)? What decision are you making implicitly when you choose bin breaks (equal interval vs.&nbsp;quantile vs.&nbsp;Jenks natural breaks)? This is not a cosmetic choice — bin choice can visually create or hide a “hot spot.”</li>
-<li>Look at the second map. Does it look like a map of environmental <em>Salmonella</em> contamination, or a map of <em>where states happened to test environmental samples</em>? Write down your answer — we’ll test it against eight years of data in Part 5.</li>
-</ol>
+
 </section>
-<section id="a-note-on-missing-data-before-we-go-further" class="slide level2">
-<h2>A note on missing data before we go further</h2>
-<p>Run <code>summary(map_data$percent_resistant)</code> again and look for <code>NA's</code>. One state — Wyoming — has a missing value in the ARPSP source data (not a join error). Small states often have their rates <strong>suppressed</strong> in public surveillance data when the underlying case count is too small to report reliably without a risk of re-identifying a patient. This is a real and recurring feature of small-area public health data, not a data-cleaning mistake to hide.</p>
+<section id="map-clinical-resistance" class="slide level2">
+<h2>Map: clinical resistance</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href=""></a>map_data <span class="sc">%&gt;%</span> <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> <span class="fu">filter</span>(<span class="fu">is.na</span>(percent_resistant)) <span class="sc">%&gt;%</span> <span class="fu">select</span>(name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(map_data) <span class="sc">+</span></span>
+<span id="cb11-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> percent_resistant), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb11-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>, <span class="at">direction =</span> <span class="dv">1</span>, <span class="at">name =</span> <span class="st">"% MDR</span><span class="sc">\n</span><span class="st">E. coli"</span>) <span class="sc">+</span></span>
+<span id="cb11-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb11-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Multidrug-resistant E. coli among HAIs, by state, 2024"</span>,</span>
+<span id="cb11-6"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"GREAT: continuous, red = higher resistance"</span>,</span>
+<span id="cb11-7"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Source: ARPSP"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/choropleth-ecoli-1.png" width="720" class="r-stretch"></section>
+<section id="map-environmental-signal" class="slide level2">
+<h2>Map: environmental signal</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(map_data) <span class="sc">+</span></span>
+<span id="cb12-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> env_isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb12-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>, <span class="at">direction =</span> <span class="dv">1</span>, <span class="at">name =</span> <span class="st">"% MDR</span><span class="sc">\n</span><span class="st">Salmonella"</span>) <span class="sc">+</span></span>
+<span id="cb12-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span></span>
+<span id="cb12-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmentally-sourced Salmonella isolates, by state, 2024"</span>,</span>
+<span id="cb12-6"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
+<span id="cb12-7"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<!--# Does this look like contamination — or like where people tested? -->
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/choropleth-beam-1.png" width="720" class="r-stretch"></section>
+<section id="on-intuitiveness-palette-choice" class="slide level2 smaller">
+<h2>On intuitiveness … palette choice?</h2>
+<p>Lets plot the same variable (<code>percent_resistant</code>), using three different color decisions.</p>
+</section>
+<section id="a-qualitative-palette-on-ordered-data" class="slide level2">
+<h2>A qualitative palette on ordered data</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data_bad <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span></span>
+<span id="cb13-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">resist_bin =</span> <span class="fu">cut</span>(percent_resistant, <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">5</span>,<span class="dv">10</span>,<span class="dv">15</span>,<span class="dv">25</span>),</span>
+<span id="cb13-3"><a href="" aria-hidden="true" tabindex="-1"></a>                           <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"0-4%"</span>,<span class="st">"5-9%"</span>,<span class="st">"10-14%"</span>,<span class="st">"15%+"</span>), <span class="at">include.lowest =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb13-4"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(map_data_bad) <span class="sc">+</span></span>
+<span id="cb13-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> resist_bin), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb13-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_brewer</span>(<span class="at">palette =</span> <span class="st">"Set1"</span>, <span class="at">name =</span> <span class="st">"% MDR</span><span class="sc">\n</span><span class="st">E. coli"</span>) <span class="sc">+</span></span>
+<span id="cb13-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">subtitle =</span> <span class="st">"Colors imply no order"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<!--# Red isn't obviously "more" than blue or green — reader has to keep re-checking the legend. -->
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/map-bad-1.png" width="720" class="r-stretch"></section>
+<section id="not-so-great-right-idea-wrong-bins" class="slide level2">
+<h2>Not so great: right idea, wrong bins</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data_meh <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span></span>
+<span id="cb14-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">resist_bin =</span> <span class="fu">cut</span>(percent_resistant, <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">20</span>,<span class="dv">40</span>,<span class="dv">60</span>,<span class="dv">80</span>,<span class="dv">100</span>),</span>
+<span id="cb14-3"><a href="" aria-hidden="true" tabindex="-1"></a>                           <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"0-19%"</span>,<span class="st">"20-39%"</span>,<span class="st">"40-59%"</span>,<span class="st">"60-79%"</span>,<span class="st">"80-100%"</span>),</span>
+<span id="cb14-4"><a href="" aria-hidden="true" tabindex="-1"></a>                           <span class="at">include.lowest =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb14-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(map_data_meh) <span class="sc">+</span></span>
+<span id="cb14-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> resist_bin), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb14-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"0-19%"</span><span class="ot">=</span><span class="st">"#FFFFB2"</span>,<span class="st">"20-39%"</span><span class="ot">=</span><span class="st">"#FECC5C"</span>,<span class="st">"40-59%"</span><span class="ot">=</span><span class="st">"#FD8D3C"</span>,</span>
+<span id="cb14-9"><a href="" aria-hidden="true" tabindex="-1"></a>                                <span class="st">"60-79%"</span><span class="ot">=</span><span class="st">"#F03B20"</span>,<span class="st">"80-100%"</span><span class="ot">=</span><span class="st">"#BD0026"</span>),</span>
+<span id="cb14-10"><a href="" aria-hidden="true" tabindex="-1"></a>                     <span class="at">name =</span> <span class="st">"% MDR</span><span class="sc">\n</span><span class="st">E. coli"</span>, <span class="at">drop =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb14-11"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>() <span class="sc">+</span> <span class="fu">labs</span>(<span class="at">subtitle =</span> <span class="st">"NOT SO GREAT: naive round-number bins"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+</div>
+<!--# Real data tops out ~25% — almost every state falls in one bucket. Bins that ignore the actual data range erase your signal. -->
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/map-meh-1.png" width="720" class="r-stretch"></section>
+<section id="much-better" class="slide level2 smaller">
+<h2>Much better</h2>
+<p>Which is better for <strong>your</strong> audience?</p>
+<div class="columns">
+<div class="column" style="width:50%;">
+<p><strong>Classed, quantile breaks</strong></p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="" aria-hidden="true" tabindex="-1"></a>qb <span class="ot">&lt;-</span> <span class="fu">quantile</span>(map_data<span class="sc">$</span>percent_resistant, <span class="at">probs =</span> <span class="fu">seq</span>(<span class="dv">0</span>,<span class="dv">1</span>,.<span class="dv">2</span>), <span class="at">na.rm =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb15-2"><a href="" aria-hidden="true" tabindex="-1"></a>map_data <span class="sc">%&gt;%</span></span>
+<span id="cb15-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">bin =</span> <span class="fu">cut</span>(percent_resistant, qb, <span class="at">include.lowest =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb15-4"><a href="" aria-hidden="true" tabindex="-1"></a>                    <span class="at">labels =</span> <span class="fu">c</span>(<span class="st">"Lowest 20%"</span>,<span class="st">"2nd"</span>,<span class="st">"3rd"</span>,<span class="st">"4th"</span>,<span class="st">"Highest 20%"</span>))) <span class="sc">%&gt;%</span></span>
+<span id="cb15-5"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>() <span class="sc">+</span> <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> bin), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb15-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_brewer</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>, <span class="at">name =</span> <span class="cn">NULL</span>) <span class="sc">+</span> <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure>
+<p><img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/map-great-classed-1.png" width="720"></p>
+</figure>
+</div>
+</div>
+</div>
+</div><div class="column" style="width:50%;">
+<p><strong>Continuous, red-toned</strong></p>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(map_data) <span class="sc">+</span></span>
+<span id="cb16-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> percent_resistant), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.15</span>) <span class="sc">+</span></span>
+<span id="cb16-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>, <span class="at">direction =</span> <span class="dv">1</span>, <span class="at">name =</span> <span class="cn">NULL</span>) <span class="sc">+</span></span>
+<span id="cb16-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="cell-output-display">
+<div>
+<figure>
+<p><img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/map-great-continuous-1.png" width="720"></p>
+</figure>
+</div>
+</div>
+</div>
+</div></div>
+<!--# Classed = easier for a general audience to read at a glance. Continuous = full precision for an analyst. Neither is "wrong." -->
+</section>
+<section id="missing-data-wyoming" class="slide level2 smaller">
+<h2>Missing data: Wyoming</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data <span class="sc">%&gt;%</span> <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> <span class="fu">filter</span>(<span class="fu">is.na</span>(percent_resistant)) <span class="sc">%&gt;%</span> <span class="fu">select</span>(name)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>     name
 1 Wyoming</code></pre>
 </div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href=""></a>map_data <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span> <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(percent_resistant))</span>
-<span id="cb23-2"><a href=""></a><span class="fu">nrow</span>(map_data)   <span class="co"># 48 states remain</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 48</code></pre>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="" aria-hidden="true" tabindex="-1"></a>map_data <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span> <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(percent_resistant))</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-</div>
-<p><strong>Discussion:</strong> dropping is not the only option — you could instead impute Wyoming’s value (e.g., a regional mean), but imputation should be a deliberate, documented choice.</p>
+<p>Wyoming’s rate is <strong>suppressed</strong> in the source data — small states often are, to avoid re-identifying patients. This is a real, recurring feature of small-area public health data, not a cleaning mistake. Drop it, or impute deliberately — but say which, and why.</p>
 </section>
 <section class="slide level2">
 
 </section></section>
-<section id="part-5-expanding-across-years-small-multiples-of-environmental-surveillance" class="title-slide slide level1 center">
-<h1>Part 5 — Expanding across years: small multiples of environmental surveillance</h1>
-<p>A single choropleth is a snapshot. Most of the interesting questions in environmental pharmacoepidemiology are about <em>change</em> — did something increase, decrease, or stay flat? The standard way to show that spatially is a <strong>small-multiples panel</strong>: the same map, repeated once per time period, laid out in a grid so the eye can compare them directly.</p>
-<p>Let’s rebuild the BEAM environmental <em>Salmonella</em> extract, this time keeping every full year from 2018 through 2025 (we’ll drop 2026 — it’s only partially reported as of today, and a partial year next to eight full years would make the most recent panel look like a decline that isn’t real).</p>
+<section>
+<section id="part-5-small-multiples-across-years" class="title-slide slide level1 center">
+<h1>Part 5 — Small multiples across years</h1>
+
+</section>
+<section id="why-a-snapshot-vs.-change" class="slide level2 smaller">
+<h2>Why: a snapshot vs.&nbsp;change</h2>
+<p>Most interesting environmental-pharmacoepi questions are about <em>change</em>. A <strong>small-multiples panel</strong> repeats the same map once per time period so the eye can compare directly.</p>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href=""></a>beam_env_years <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb25-2"><a href=""></a>  <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
-<span id="cb25-3"><a href=""></a>         year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
-<span id="cb25-4"><a href=""></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb25-5"><a href=""></a>  <span class="fu">group_by</span>(state, year) <span class="sc">%&gt;%</span></span>
-<span id="cb25-6"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="" aria-hidden="true" tabindex="-1"></a>beam_panel <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(<span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps, <span class="at">year =</span> <span class="dv">2018</span><span class="sc">:</span><span class="dv">2025</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb20-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
+<span id="cb20-3"><a href="" aria-hidden="true" tabindex="-1"></a>    beam <span class="sc">%&gt;%</span> <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
+<span id="cb20-4"><a href="" aria-hidden="true" tabindex="-1"></a>                     year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>, state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb20-5"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">group_by</span>(state, year) <span class="sc">%&gt;%</span></span>
+<span id="cb20-6"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>),</span>
+<span id="cb20-7"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"year"</span>)</span>
+<span id="cb20-8"><a href="" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
+<span id="cb20-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>))</span>
+<span id="cb20-10"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-11"><a href="" aria-hidden="true" tabindex="-1"></a>panel_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span> <span class="fu">select</span>(stusps, geometry) <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(beam_panel, <span class="at">by =</span> <span class="st">"stusps"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
-<p>Every CONUS state should get one row for <em>every</em> year, even the years it reported nothing — an absent row and a reported zero mean different things once you’re building a panel, and only one of them is correct here.</p>
+<p><em>(We dropped 2026 — partial year would look like a artificial decline.)</em></p>
+</section>
+<section id="map-all-years-on-one-scale" class="slide level2">
+<h2>Map: all years on one scale</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href=""></a>beam_panel <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(</span>
-<span id="cb26-2"><a href=""></a>  <span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps,</span>
-<span id="cb26-3"><a href=""></a>  <span class="at">year   =</span> <span class="dv">2018</span><span class="sc">:</span><span class="dv">2025</span></span>
-<span id="cb26-4"><a href=""></a>) <span class="sc">%&gt;%</span></span>
-<span id="cb26-5"><a href=""></a>  <span class="fu">left_join</span>(beam_env_years, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"year"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb26-6"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>))</span>
-<span id="cb26-7"><a href=""></a></span>
-<span id="cb26-8"><a href=""></a><span class="fu">nrow</span>(beam_panel)   <span class="co"># 49 states x 8 years</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 392</code></pre>
-</div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href=""></a>panel_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span></span>
-<span id="cb28-2"><a href=""></a>  <span class="fu">select</span>(stusps, name, geometry) <span class="sc">%&gt;%</span></span>
-<span id="cb28-3"><a href=""></a>  <span class="fu">left_join</span>(beam_panel, <span class="at">by =</span> <span class="st">"stusps"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href=""></a><span class="fu">ggplot</span>(panel_sf) <span class="sc">+</span></span>
-<span id="cb29-2"><a href=""></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
-<span id="cb29-3"><a href=""></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> year, <span class="at">ncol =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
-<span id="cb29-4"><a href=""></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Environmental</span><span class="sc">\n</span><span class="st">Salmonella</span><span class="sc">\n</span><span class="st">isolates"</span>,</span>
-<span id="cb29-5"><a href=""></a>                        <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fu">max</span>(panel_sf<span class="sc">$</span>isolates))) <span class="sc">+</span></span>
-<span id="cb29-6"><a href=""></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
-<span id="cb29-7"><a href=""></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
-<span id="cb29-8"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmentally-sourced Salmonella isolates by state, 2018-2025"</span>,</span>
-<span id="cb29-9"><a href=""></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
-<span id="cb29-10"><a href=""></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(panel_sf) <span class="sc">+</span></span>
+<span id="cb21-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
+<span id="cb21-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> year, <span class="at">ncol =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb21-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>,  <span class="at">direction =</span> <span class="dv">1</span>, <span class="at">name =</span> <span class="st">"Environmental</span><span class="sc">\n</span><span class="st">Salmonella</span><span class="sc">\n</span><span class="st">isolates"</span>,</span>
+<span id="cb21-5"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fu">max</span>(panel_sf<span class="sc">$</span>isolates))) <span class="sc">+</span></span>
+<span id="cb21-6"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
+<span id="cb21-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
+<span id="cb21-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmentally-sourced Salmonella isolates by state, 2018-2025"</span>,</span>
+<span id="cb21-9"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
+<span id="cb21-10"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet-years-1.png" width="960" class="r-stretch"><p><strong>Why the <code>limits = c(0, max(panel_sf$isolates))</code> matters.</strong> Every panel here shares one color scale, built from the range of <em>all eight years combined</em>. If you instead mapped each year separately with its own default scale, a state with 5 isolates in a low year could look just as “dark” as a state with 50 isolates in a high year — same color, wildly different magnitude. A shared scale is what makes a small-multiples panel an honest comparison instead of eight unrelated pictures that happen to share an axis. This is arguably the single most common way choropleth series mislead a reader, and it’s a one-line fix.</p>
-<p><strong>Discussion prompts:</strong></p>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet-years-1.png" width="960" class="r-stretch"></section>
+<section id="why-one-shared-scale" class="slide level2 smaller">
+<h2>Why one shared scale?</h2>
+<p>Every panel uses <strong>one</strong> color scale built from all 8 years combined.</p>
+<p>Map each year with its own default scale instead, and a state with 5 isolates in a low year looks just as “dark” as one with 50 in a high year — same color, wildly different magnitude.</p>
+<blockquote>
+<p>A shared scale is what makes a small-multiples panel an honest comparison, not eight unrelated pictures that happen to share an axis.</p>
+</blockquote>
+</section>
+<section id="discussion" class="slide level2 smaller scrollable">
+<h2>Discussion</h2>
 <ol type="1">
-<li>Which one or two states look like they’re driving most of the signal across the panel? Pull up their individual year-by-year isolate counts and check your visual read against the numbers.</li>
-<li>Do any years look like a sharp jump or drop for many states at once (rather than one state)? A change that shows up broadly, in the same year, across unrelated states, is more likely a <strong>reporting or methods change</strong> than eight independent outbreaks.</li>
-<li>Go back to your answer from Part 4, question 2. Now that you can see which states report <em>consistently</em> across all eight years versus which show up once or twice — does that change your read on whether this layer measures contamination, testing effort, or some mix of both?</li>
+<li>Which state(s) drive most of the signal? Check the individual numbers against your visual read.</li>
+<li>Any year jump broadly, across many unrelated states at once? That smells like a <strong>reporting/methods change</strong>, not eight independent outbreaks.</li>
+<li>Which states report <em>consistently</em> across all 8 years vs.&nbsp;show up once or twice — does that change your read on contamination vs.&nbsp;testing effort?</li>
 </ol>
 </section>
+<section class="slide level2">
 
-<section id="total-salmonella-isolates-by-source-type-2018-2025-pooled-look-at-the" class="title-slide slide level1 center">
-<h1>Total Salmonella isolates by source type, 2018-2025 pooled – look at the</h1>
+</section></section>
+<section>
+<section id="bonus-comparing-across-sources" class="title-slide slide level1 center">
+<h1>Bonus — Comparing across sources</h1>
 
 </section>
-
-<section id="scale-of-the-imbalance-before-you-try-to-map-it." class="title-slide slide level1 center">
-<h1>scale of the imbalance before you try to map it.</h1>
+<section id="salmonella-isolates-arent-sampled-equally" class="slide level2 smaller">
+<h2>Salmonella isolates aren’t sampled equally</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb30"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href=""></a>salm_source_totals <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb30-2"><a href=""></a>  <span class="fu">filter</span>(pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>, year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
-<span id="cb30-3"><a href=""></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb30-4"><a href=""></a>  <span class="fu">group_by</span>(source_type) <span class="sc">%&gt;%</span></span>
-<span id="cb30-5"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb30-6"><a href=""></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(isolates))</span>
-<span id="cb30-7"><a href=""></a></span>
-<span id="cb30-8"><a href=""></a>salm_source_totals</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 4 × 2
-  source_type isolates
-  &lt;chr&gt;          &lt;dbl&gt;
-1 Human         385868
-2 Food           46631
-3 Animal         10327
-4 Environment     3042</code></pre>
-</div>
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb32"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href=""></a><span class="fu">ggplot</span>(salm_source_totals, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">reorder</span>(source_type, isolates), <span class="at">y =</span> isolates)) <span class="sc">+</span></span>
-<span id="cb32-2"><a href=""></a>  <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#440154FF"</span>) <span class="sc">+</span></span>
-<span id="cb32-3"><a href=""></a>  <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
-<span id="cb32-4"><a href=""></a>  <span class="fu">scale_y_continuous</span>(<span class="at">labels =</span> comma) <span class="sc">+</span></span>
-<span id="cb32-5"><a href=""></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Total Salmonella isolates, 2018-2025 (log10 axis)"</span>,</span>
-<span id="cb32-6"><a href=""></a>       <span class="at">title =</span> <span class="st">"Salmonella isolates by source type"</span>) <span class="sc">+</span></span>
-<span id="cb32-7"><a href=""></a>  <span class="fu">scale_y_log10</span>(<span class="at">labels =</span> comma) <span class="sc">+</span></span>
-<span id="cb32-8"><a href=""></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="" aria-hidden="true" tabindex="-1"></a>salm_source_totals <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
+<span id="cb22-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>, year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>, state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb22-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(source_type) <span class="sc">%&gt;%</span></span>
+<span id="cb22-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb22-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(salm_source_totals, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">reorder</span>(source_type, isolates), <span class="at">y =</span> isolates)) <span class="sc">+</span></span>
+<span id="cb22-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#440154FF"</span>) <span class="sc">+</span> <span class="fu">coord_flip</span>() <span class="sc">+</span></span>
+<span id="cb22-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_y_log10</span>(<span class="at">labels =</span> comma) <span class="sc">+</span></span>
+<span id="cb22-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Total isolates, 2018-2025 (log10 axis)"</span>,</span>
+<span id="cb22-10"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">title =</span> <span class="st">"Salmonella isolates by source type"</span>) <span class="sc">+</span> <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet-1.png" width="768" class="r-stretch"></section>
-
-<section>
-<section id="state-x-source-type-panel-same-zero-fill-logic-as-parts-5-6." class="title-slide slide level1 center">
-<h1>State x source-type panel, same zero-fill logic as Parts 5-6.</h1>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/source-totals-1.png" width="720" class="r-stretch"><p>Human ≈ 387,000. Environment ≈ 3,000. <strong>Over 100× apart.</strong></p>
+</section>
+<section id="map-source-type-log-scale" class="slide level2 smaller">
+<h2>Map: source type, log scale</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb33"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href=""></a>salm_by_source <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb33-2"><a href=""></a>  <span class="fu">filter</span>(pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>, year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
-<span id="cb33-3"><a href=""></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb33-4"><a href=""></a>  <span class="fu">group_by</span>(state, source_type) <span class="sc">%&gt;%</span></span>
-<span id="cb33-5"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb33-6"><a href=""></a></span>
-<span id="cb33-7"><a href=""></a>source_types <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Environment"</span>, <span class="st">"Animal"</span>, <span class="st">"Food"</span>, <span class="st">"Human"</span>)</span>
-<span id="cb33-8"><a href=""></a></span>
-<span id="cb33-9"><a href=""></a>salm_source_panel <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(<span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps, <span class="at">source_type =</span> source_types) <span class="sc">%&gt;%</span></span>
-<span id="cb33-10"><a href=""></a>  <span class="fu">left_join</span>(salm_by_source, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"source_type"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb33-11"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>),</span>
-<span id="cb33-12"><a href=""></a>         <span class="at">source_type =</span> <span class="fu">factor</span>(source_type, <span class="at">levels =</span> source_types))</span>
-<span id="cb33-13"><a href=""></a></span>
-<span id="cb33-14"><a href=""></a>salm_source_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span></span>
-<span id="cb33-15"><a href=""></a>  <span class="fu">select</span>(stusps, geometry) <span class="sc">%&gt;%</span></span>
-<span id="cb33-16"><a href=""></a>  <span class="fu">left_join</span>(salm_source_panel, <span class="at">by =</span> <span class="st">"stusps"</span>)</span>
-<span id="cb33-17"><a href=""></a></span>
-<span id="cb33-18"><a href=""></a><span class="co"># Raw counts on one shared scale would make Environment/Animal/Food look</span></span>
-<span id="cb33-19"><a href=""></a><span class="co"># essentially blank next to Human -- log10(isolates + 1) lets all four</span></span>
-<span id="cb33-20"><a href=""></a><span class="co"># panels show internal spatial variation at once. Note in the legend that</span></span>
-<span id="cb33-21"><a href=""></a><span class="co"># it's a log scale, NOT LINEAR</span></span>
-<span id="cb33-22"><a href=""></a><span class="fu">ggplot</span>(salm_source_sf) <span class="sc">+</span></span>
-<span id="cb33-23"><a href=""></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
-<span id="cb33-24"><a href=""></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> source_type, <span class="at">nrow =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb33-25"><a href=""></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Salmonella</span><span class="sc">\n</span><span class="st">isolates</span><span class="sc">\n</span><span class="st">(log10 scale)"</span>,</span>
-<span id="cb33-26"><a href=""></a>                        <span class="at">trans =</span> <span class="st">"log1p"</span>,</span>
-<span id="cb33-27"><a href=""></a>                        <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">10</span>, <span class="dv">100</span>, <span class="dv">1000</span>, <span class="dv">10000</span>)) <span class="sc">+</span></span>
-<span id="cb33-28"><a href=""></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
-<span id="cb33-29"><a href=""></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
-<span id="cb33-30"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Salmonella isolates by source type and state, 2018-2025 pooled"</span>,</span>
-<span id="cb33-31"><a href=""></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
-<span id="cb33-32"><a href=""></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard. Color scale is log-transformed -- do not compare panels visually as if linear."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="" aria-hidden="true" tabindex="-1"></a>source_types <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Environment"</span>, <span class="st">"Animal"</span>, <span class="st">"Food"</span>, <span class="st">"Human"</span>)</span>
+<span id="cb23-2"><a href="" aria-hidden="true" tabindex="-1"></a>salm_source_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span> <span class="fu">select</span>(stusps, geometry) <span class="sc">%&gt;%</span></span>
+<span id="cb23-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
+<span id="cb23-4"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="fu">expand_grid</span>(<span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps, <span class="at">source_type =</span> source_types) <span class="sc">%&gt;%</span></span>
+<span id="cb23-5"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(beam <span class="sc">%&gt;%</span> <span class="fu">filter</span>(pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>, year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
+<span id="cb23-6"><a href="" aria-hidden="true" tabindex="-1"></a>                                 state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb23-7"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">group_by</span>(state, source_type) <span class="sc">%&gt;%</span></span>
+<span id="cb23-8"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>),</span>
+<span id="cb23-9"><a href="" aria-hidden="true" tabindex="-1"></a>                <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"source_type"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb23-10"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>), <span class="at">source_type =</span> <span class="fu">factor</span>(source_type, <span class="at">levels =</span> source_types)),</span>
+<span id="cb23-11"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="st">"stusps"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</div>
+</section>
+<section id="map-output" class="slide level2">
+<h2>Map output</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(salm_source_sf) <span class="sc">+</span></span>
+<span id="cb24-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
+<span id="cb24-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> source_type, <span class="at">nrow =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb24-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>,  <span class="at">direction =</span> <span class="dv">1</span>,</span>
+<span id="cb24-5"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="at">name =</span> <span class="st">"Salmonella</span><span class="sc">\n</span><span class="st">isolates</span><span class="sc">\n</span><span class="st">(log10 scale)"</span>,</span>
+<span id="cb24-6"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="at">trans =</span> <span class="st">"log1p"</span>,</span>
+<span id="cb24-7"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="at">breaks =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="dv">10</span>, <span class="dv">100</span>, <span class="dv">1000</span>, <span class="dv">10000</span>)) <span class="sc">+</span></span>
+<span id="cb24-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
+<span id="cb24-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
+<span id="cb24-10"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Salmonella isolates by source type and state, 2018-2025 pooled"</span>,</span>
+<span id="cb24-11"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
+<span id="cb24-12"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard. Color scale is log-transformed -- do not compare panels visually as if linear."</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet2-1.png" width="768" class="r-stretch"></section>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/source-map2-1.png" width="1440" class="r-stretch"></section>
 <section class="slide level2">
 
 </section></section>
 <section>
 <section id="part-6-is-there-a-seasonal-pattern" class="title-slide slide level1 center">
 <h1>Part 6 — Is there a seasonal pattern?</h1>
-<p>Small multiples don’t have to be organized by year — the same technique works for any repeating unit of time. Here we’ll look at <em>season</em>, using all eight years pooled together so each panel has enough data behind it to be worth looking at.</p>
+
 </section>
-<section id="a.-start-non-spatial-what-does-the-distribution-look-like" class="slide level2">
-<h2>6a. Start non-spatial: what does the distribution look like?</h2>
-<p>Before mapping anything, look at the plain distribution. Pooling across 2018-2025 gives us enough isolates per month to see a shape, where any single year would mostly be noise.</p>
+<section id="a.-non-spatial-first" class="slide level2 smaller">
+<h2>6a. Non-spatial first</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb34"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href=""></a>monthly_totals <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb34-2"><a href=""></a>  <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
-<span id="cb34-3"><a href=""></a>         year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
-<span id="cb34-4"><a href=""></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb34-5"><a href=""></a>  <span class="fu">group_by</span>(month) <span class="sc">%&gt;%</span></span>
-<span id="cb34-6"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb34-7"><a href=""></a></span>
-<span id="cb34-8"><a href=""></a><span class="fu">ggplot</span>(monthly_totals, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">factor</span>(month), <span class="at">y =</span> isolates)) <span class="sc">+</span></span>
-<span id="cb34-9"><a href=""></a>  <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#21908CFF"</span>) <span class="sc">+</span></span>
-<span id="cb34-10"><a href=""></a>  <span class="fu">scale_x_discrete</span>(<span class="at">labels =</span> month.abb) <span class="sc">+</span></span>
-<span id="cb34-11"><a href=""></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Total isolates, 2018-2025 pooled (all CONUS states)"</span>,</span>
-<span id="cb34-12"><a href=""></a>       <span class="at">title =</span> <span class="st">"Monthly distribution of environmental Salmonella isolates"</span>) <span class="sc">+</span></span>
-<span id="cb34-13"><a href=""></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="" aria-hidden="true" tabindex="-1"></a>monthly_totals <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
+<span id="cb25-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
+<span id="cb25-3"><a href="" aria-hidden="true" tabindex="-1"></a>         year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>, state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb25-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(month) <span class="sc">%&gt;%</span> <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb25-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb25-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(monthly_totals, <span class="fu">aes</span>(<span class="at">x =</span> <span class="fu">factor</span>(month), <span class="at">y =</span> isolates)) <span class="sc">+</span></span>
+<span id="cb25-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>(<span class="at">fill =</span> <span class="st">"#21908CFF"</span>) <span class="sc">+</span> <span class="fu">scale_x_discrete</span>(<span class="at">labels =</span> month.abb) <span class="sc">+</span></span>
+<span id="cb25-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="cn">NULL</span>, <span class="at">y =</span> <span class="st">"Isolates, 2018-2025 pooled"</span>, <span class="at">title =</span> <span class="st">"Monthly distribution"</span>) <span class="sc">+</span></span>
+<span id="cb25-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/seasonality-national-1.png" width="768" class="r-stretch"><p><strong>Discussion:</strong> Does this look seasonal to you, or does it look close to flat with some noise? What would make you more confident either way — more years, more states, or something else?</p>
-</section>
-<section id="b.-now-map-the-same-idea" class="slide level2">
-<h2>6b. Now map the same idea</h2>
-<p>Group the same eight years of data into four seasons per state, so we can see whether the pattern in 6a is broadly shared across the country or driven by a handful of states.</p>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/seasonality-national-1.png" width="720" class="r-stretch"></section>
+<section id="b.-map-the-same-idea" class="slide level2">
+<h2>6b. Map the same idea</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb35"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href=""></a>season_levels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Winter (Dec-Feb)"</span>, <span class="st">"Spring (Mar-May)"</span>,</span>
-<span id="cb35-2"><a href=""></a>                    <span class="st">"Summer (Jun-Aug)"</span>, <span class="st">"Fall (Sep-Nov)"</span>)</span>
-<span id="cb35-3"><a href=""></a></span>
-<span id="cb35-4"><a href=""></a>beam_season <span class="ot">&lt;-</span> beam <span class="sc">%&gt;%</span></span>
-<span id="cb35-5"><a href=""></a>  <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
-<span id="cb35-6"><a href=""></a>         year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>,</span>
-<span id="cb35-7"><a href=""></a>         state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
-<span id="cb35-8"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">season =</span> <span class="fu">case_when</span>(</span>
-<span id="cb35-9"><a href=""></a>    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">12</span>, <span class="dv">1</span>, <span class="dv">2</span>)  <span class="sc">~</span> <span class="st">"Winter (Dec-Feb)"</span>,</span>
-<span id="cb35-10"><a href=""></a>    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">3</span>, <span class="dv">4</span>, <span class="dv">5</span>)   <span class="sc">~</span> <span class="st">"Spring (Mar-May)"</span>,</span>
-<span id="cb35-11"><a href=""></a>    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">6</span>, <span class="dv">7</span>, <span class="dv">8</span>)   <span class="sc">~</span> <span class="st">"Summer (Jun-Aug)"</span>,</span>
-<span id="cb35-12"><a href=""></a>    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">9</span>, <span class="dv">10</span>, <span class="dv">11</span>) <span class="sc">~</span> <span class="st">"Fall (Sep-Nov)"</span></span>
-<span id="cb35-13"><a href=""></a>  )) <span class="sc">%&gt;%</span></span>
-<span id="cb35-14"><a href=""></a>  <span class="fu">group_by</span>(state, season) <span class="sc">%&gt;%</span></span>
-<span id="cb35-15"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb35-16"><a href=""></a></span>
-<span id="cb35-17"><a href=""></a>season_panel <span class="ot">&lt;-</span> <span class="fu">expand_grid</span>(<span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps, <span class="at">season =</span> season_levels) <span class="sc">%&gt;%</span></span>
-<span id="cb35-18"><a href=""></a>  <span class="fu">left_join</span>(beam_season, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"season"</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb35-19"><a href=""></a>  <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>),</span>
-<span id="cb35-20"><a href=""></a>         <span class="at">season =</span> <span class="fu">factor</span>(season, <span class="at">levels =</span> season_levels))</span>
-<span id="cb35-21"><a href=""></a></span>
-<span id="cb35-22"><a href=""></a>season_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span></span>
-<span id="cb35-23"><a href=""></a>  <span class="fu">select</span>(stusps, geometry) <span class="sc">%&gt;%</span></span>
-<span id="cb35-24"><a href=""></a>  <span class="fu">left_join</span>(season_panel, <span class="at">by =</span> <span class="st">"stusps"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="" aria-hidden="true" tabindex="-1"></a>season_levels <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Winter (Dec-Feb)"</span>,<span class="st">"Spring (Mar-May)"</span>,<span class="st">"Summer (Jun-Aug)"</span>,<span class="st">"Fall (Sep-Nov)"</span>)</span>
+<span id="cb26-2"><a href="" aria-hidden="true" tabindex="-1"></a>season_sf <span class="ot">&lt;-</span> states_conus <span class="sc">%&gt;%</span> <span class="fu">select</span>(stusps, geometry) <span class="sc">%&gt;%</span></span>
+<span id="cb26-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(</span>
+<span id="cb26-4"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="fu">expand_grid</span>(<span class="at">stusps =</span> states_conus<span class="sc">$</span>stusps, <span class="at">season =</span> season_levels) <span class="sc">%&gt;%</span></span>
+<span id="cb26-5"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">left_join</span>(beam <span class="sc">%&gt;%</span> <span class="fu">filter</span>(source_type <span class="sc">==</span> <span class="st">"Environment"</span>, pathogen <span class="sc">==</span> <span class="st">"Salmonella"</span>,</span>
+<span id="cb26-6"><a href="" aria-hidden="true" tabindex="-1"></a>                                 year <span class="sc">&gt;=</span> <span class="dv">2018</span>, year <span class="sc">&lt;=</span> <span class="dv">2025</span>, state <span class="sc">%in%</span> valid_state_codes) <span class="sc">%&gt;%</span></span>
+<span id="cb26-7"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">mutate</span>(<span class="at">season =</span> <span class="fu">case_when</span>(</span>
+<span id="cb26-8"><a href="" aria-hidden="true" tabindex="-1"></a>                    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">12</span>,<span class="dv">1</span>,<span class="dv">2</span>) <span class="sc">~</span> <span class="st">"Winter (Dec-Feb)"</span>, month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">3</span>,<span class="dv">4</span>,<span class="dv">5</span>) <span class="sc">~</span> <span class="st">"Spring (Mar-May)"</span>,</span>
+<span id="cb26-9"><a href="" aria-hidden="true" tabindex="-1"></a>                    month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">6</span>,<span class="dv">7</span>,<span class="dv">8</span>) <span class="sc">~</span> <span class="st">"Summer (Jun-Aug)"</span>, month <span class="sc">%in%</span> <span class="fu">c</span>(<span class="dv">9</span>,<span class="dv">10</span>,<span class="dv">11</span>) <span class="sc">~</span> <span class="st">"Fall (Sep-Nov)"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb26-10"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">group_by</span>(state, season) <span class="sc">%&gt;%</span></span>
+<span id="cb26-11"><a href="" aria-hidden="true" tabindex="-1"></a>                  <span class="fu">summarize</span>(<span class="at">isolates =</span> <span class="fu">sum</span>(number_of_isolates, <span class="at">na.rm =</span> <span class="cn">TRUE</span>), <span class="at">.groups =</span> <span class="st">"drop"</span>),</span>
+<span id="cb26-12"><a href="" aria-hidden="true" tabindex="-1"></a>                <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"stusps"</span> <span class="ot">=</span> <span class="st">"state"</span>, <span class="st">"season"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb26-13"><a href="" aria-hidden="true" tabindex="-1"></a>      <span class="fu">mutate</span>(<span class="at">isolates =</span> <span class="fu">coalesce</span>(isolates, <span class="dv">0</span>), <span class="at">season =</span> <span class="fu">factor</span>(season, <span class="at">levels =</span> season_levels)),</span>
+<span id="cb26-14"><a href="" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="st">"stusps"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 </div>
+</section>
+<section id="map-output-1" class="slide level2">
+<h2>Map output</h2>
 <div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb36"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href=""></a><span class="fu">ggplot</span>(season_sf) <span class="sc">+</span></span>
-<span id="cb36-2"><a href=""></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
-<span id="cb36-3"><a href=""></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> season, <span class="at">nrow =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
-<span id="cb36-4"><a href=""></a>  <span class="fu">scale_fill_viridis_c</span>(<span class="at">name =</span> <span class="st">"Environmental</span><span class="sc">\n</span><span class="st">Salmonella</span><span class="sc">\n</span><span class="st">isolates"</span>,</span>
-<span id="cb36-5"><a href=""></a>                        <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fu">max</span>(season_sf<span class="sc">$</span>isolates))) <span class="sc">+</span></span>
-<span id="cb36-6"><a href=""></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
-<span id="cb36-7"><a href=""></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
-<span id="cb36-8"><a href=""></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmental Salmonella isolates by season, 2018-2025 pooled"</span>,</span>
-<span id="cb36-9"><a href=""></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
-<span id="cb36-10"><a href=""></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(season_sf) <span class="sc">+</span></span>
+<span id="cb27-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_sf</span>(<span class="fu">aes</span>(<span class="at">fill =</span> isolates), <span class="at">color =</span> <span class="st">"white"</span>, <span class="at">linewidth =</span> <span class="fl">0.05</span>) <span class="sc">+</span></span>
+<span id="cb27-3"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span> season, <span class="at">nrow =</span> <span class="dv">1</span>) <span class="sc">+</span></span>
+<span id="cb27-4"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_distiller</span>(<span class="at">palette =</span> <span class="st">"YlOrRd"</span>,  <span class="at">direction =</span> <span class="dv">1</span>,</span>
+<span id="cb27-5"><a href="" aria-hidden="true" tabindex="-1"></a>                       <span class="at">name =</span> <span class="st">"Environmental</span><span class="sc">\n</span><span class="st">Salmonella</span><span class="sc">\n</span><span class="st">isolates"</span>,</span>
+<span id="cb27-6"><a href="" aria-hidden="true" tabindex="-1"></a>                        <span class="at">limits =</span> <span class="fu">c</span>(<span class="dv">0</span>, <span class="fu">max</span>(season_sf<span class="sc">$</span>isolates))) <span class="sc">+</span></span>
+<span id="cb27-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_void</span>(<span class="at">base_size =</span> <span class="dv">9</span>) <span class="sc">+</span></span>
+<span id="cb27-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">strip.text =</span> <span class="fu">element_text</span>(<span class="at">face =</span> <span class="st">"bold"</span>)) <span class="sc">+</span></span>
+<span id="cb27-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Environmental Salmonella isolates by season, 2018-2025 pooled"</span>,</span>
+<span id="cb27-10"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">subtitle =</span> <span class="st">"CDC BEAM enteric bacteria surveillance"</span>,</span>
+<span id="cb27-11"><a href="" aria-hidden="true" tabindex="-1"></a>       <span class="at">caption =</span> <span class="st">"Source: BEAM Dashboard"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet-season-map-1.png" width="960" class="r-stretch"><p><strong>Discussion prompts:</strong></p>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/facet-season-map-1.png" width="1440" class="r-stretch"></section>
+<section id="discussion-1" class="slide level2 smaller scrollable">
+<h2>Discussion</h2>
 <ol type="1">
-<li><em>Salmonella</em> survival and growth in water and soil is generally understood to be temperature-dependent, which would predict a warm-season peak. Does the summer panel support that here? Before you answer yes, go back to the surveillance-effort caution from Part 1b and Part 5 — what competing explanation do you need to rule out first?</li>
-<li>Are the same states lighting up in Part 5’s year panels and this season panel? A state that’s consistently high across all seasons is telling you a different story than a state that’s high in exactly one season.</li>
-<li>Why did we pool eight years into four seasons instead of mapping, say, just August 2024 across all states? (Look back at how sparse the single-year, single-month cells would have been.)</li>
+<li>Warm-season <em>Salmonella</em> peak is biologically plausible — does the summer panel support it? What competing explanation (surveillance effort) must you rule out first?</li>
+<li>Same states lighting up here as in Part 5’s year panels? Consistently-high ≠ seasonally-high.</li>
+<li>Why pool 8 years into 4 seasons instead of mapping one month of one year? (How sparse would that cell be?)</li>
 </ol>
 </section>
 <section class="slide level2">
 
 </section></section>
-<section id="part-7-linking-the-environmental-signal-to-the-clinical-outcome" class="title-slide slide level1 center">
-<h1>Part 7 — Linking the environmental signal to the clinical outcome</h1>
-<p>Now the environmental pharmacoepi question: is a state’s environmental surveillance signal for <em>Salmonella</em> associated with its clinical MDR <em>E. coli</em> burden? We’ll use the full 2018-2025 total this time as we just saw in parts 5-6 just a single year can be noisy.</p>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb37"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href=""></a>env_total <span class="ot">&lt;-</span> beam_panel <span class="sc">%&gt;%</span></span>
-<span id="cb37-2"><a href=""></a>  <span class="fu">group_by</span>(stusps) <span class="sc">%&gt;%</span></span>
-<span id="cb37-3"><a href=""></a>  <span class="fu">summarize</span>(<span class="at">env_isolates_total =</span> <span class="fu">sum</span>(isolates), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
-<span id="cb37-4"><a href=""></a></span>
-<span id="cb37-5"><a href=""></a><span class="fu">sum</span>(env_total<span class="sc">$</span>env_isolates_total <span class="sc">==</span> <span class="dv">0</span>)   <span class="co"># states with zero isolates, 2018-2025 combined</span></span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
-<div class="cell-output cell-output-stdout">
-<pre><code>[1] 14</code></pre>
-</div>
-</div>
-<div class="cell">
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb39"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb39-1"><a href=""></a>plot_df <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span></span>
-<span id="cb39-2"><a href=""></a>  <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb39-3"><a href=""></a>  <span class="fu">left_join</span>(env_total, <span class="at">by =</span> <span class="st">"stusps"</span>)</span>
-<span id="cb39-4"><a href=""></a></span>
-<span id="cb39-5"><a href=""></a><span class="fu">ggplot</span>(plot_df, <span class="fu">aes</span>(<span class="at">x =</span> env_isolates_total, <span class="at">y =</span> percent_resistant)) <span class="sc">+</span></span>
-<span id="cb39-6"><a href=""></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">2</span>, <span class="at">alpha =</span> <span class="fl">0.7</span>) <span class="sc">+</span></span>
-<span id="cb39-7"><a href=""></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">TRUE</span>, <span class="at">color =</span> <span class="st">"firebrick"</span>) <span class="sc">+</span></span>
-<span id="cb39-8"><a href=""></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Environmental Salmonella isolates, 2018-2025 total"</span>,</span>
-<span id="cb39-9"><a href=""></a>       <span class="at">y =</span> <span class="st">"% MDR E. coli among HAIs, 2024"</span>,</span>
-<span id="cb39-10"><a href=""></a>       <span class="at">title =</span> <span class="st">"Multi-year environmental surveillance signal vs. clinical resistance burden"</span>) <span class="sc">+</span></span>
-<span id="cb39-11"><a href=""></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+<section>
+<section id="part-7-linking-exposure-to-outcome" class="title-slide slide level1 center">
+<h1>Part 7 — Linking exposure to outcome</h1>
 
-<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb40"><pre class="sourceCode numberSource r number-lines code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href=""></a><span class="fu">cor.test</span>(plot_df<span class="sc">$</span>env_isolates_total, plot_df<span class="sc">$</span>percent_resistant, <span class="at">method =</span> <span class="st">"spearman"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+</section>
+<section id="multi-year-signal-vs.-clinical-burden" class="slide level2 smaller">
+<h2>Multi-year signal vs.&nbsp;clinical burden</h2>
+<div class="cell">
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="" aria-hidden="true" tabindex="-1"></a>env_total <span class="ot">&lt;-</span> beam_panel <span class="sc">%&gt;%</span> <span class="fu">group_by</span>(stusps) <span class="sc">%&gt;%</span></span>
+<span id="cb28-2"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarize</span>(<span class="at">env_isolates_total =</span> <span class="fu">sum</span>(isolates), <span class="at">.groups =</span> <span class="st">"drop"</span>)</span>
+<span id="cb28-3"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-4"><a href="" aria-hidden="true" tabindex="-1"></a>plot_df <span class="ot">&lt;-</span> map_data <span class="sc">%&gt;%</span> <span class="fu">st_drop_geometry</span>() <span class="sc">%&gt;%</span> <span class="fu">left_join</span>(env_total, <span class="at">by =</span> <span class="st">"stusps"</span>)</span>
+<span id="cb28-5"><a href="" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-6"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_df, <span class="fu">aes</span>(<span class="at">x =</span> env_isolates_total, <span class="at">y =</span> percent_resistant)) <span class="sc">+</span></span>
+<span id="cb28-7"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">2</span>, <span class="at">alpha =</span> <span class="fl">0.7</span>) <span class="sc">+</span></span>
+<span id="cb28-8"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">method =</span> <span class="st">"lm"</span>, <span class="at">se =</span> <span class="cn">TRUE</span>, <span class="at">color =</span> <span class="st">"firebrick"</span>) <span class="sc">+</span></span>
+<span id="cb28-9"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Environmental Salmonella isolates, 2018-2025"</span>, <span class="at">y =</span> <span class="st">"% MDR E. coli, 2024"</span>) <span class="sc">+</span></span>
+<span id="cb28-10"><a href="" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
+
+<div class="code-copy-outer-scaffold"><div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="" aria-hidden="true" tabindex="-1"></a><span class="fu">cor.test</span>(plot_df<span class="sc">$</span>env_isolates_total, plot_df<span class="sc">$</span>percent_resistant, <span class="at">method =</span> <span class="st">"spearman"</span>)</span></code></pre></div><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
     Spearman's rank correlation rho
@@ -728,39 +740,39 @@ sample estimates:
 0.05831997 </code></pre>
 </div>
 </div>
-<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/scatter-1.png" width="768" class="r-stretch"><p><strong>Discussion of the exercise. Work through it as a group.</strong></p>
-<ol type="1">
-<li>Is there a correlation? Is it what you expected? Compare the number of zero-isolate states here (pooling eight years) to the single-year 2024 map from Part 4 — pooling helped, but did it fully solve the surveillance-effort problem, or just shrink it?</li>
-<li>This is still <strong>surveillance/detection bias</strong>: an “exposure” built from surveillance counts is measuring exposure <em>and</em> testing effort at the same time, and you generally can’t fully separate the two from counts alone.</li>
-<li>Both variables here are aggregated to the <em>state</em> level, an administrative boundary chosen for governance, not for epidemiology. Two pieces of jargon worth knowing cold for this field:
-<ul>
-<li><strong>Ecological fallacy</strong>: even if the correlation above is real, it tells you nothing about <em>individual</em> patients — you cannot conclude that a specific person’s resistant infection was caused by environmental exposure just because their state shows an association.</li>
-<li><strong>Modifiable Areal Unit Problem (MAUP)</strong>: had we aggregated to counties, HHS regions, or watersheds instead of states, both the magnitude and even the direction of this relationship could change, simply from redrawing the boundaries — with no change to the underlying reality.</li>
-</ul></li>
-<li>If you were designing a real study on this question, what exposure variable would you actually want, and at what spatial <em>and temporal</em> resolution?</li>
-</ol>
+<img data-src="GIS_Slides_EnvPharmacoepi_files/figure-revealjs/scatter-1.png" width="720" class="r-stretch"></section>
+<section id="two-concepts-relevant-to-these-findings" class="slide level2 smaller">
+<h2>Two concepts relevant to these findings</h2>
+<p><strong>Ecological fallacy</strong> — even a state-level correlation tells you nothing about an <em>individual</em> patient’s exposure-outcome link.</p>
+<p><strong>MAUP</strong> (Modifiable Areal Unit Problem) — aggregate to counties, HHS regions, or watersheds instead of states, and both the magnitude <em>and direction</em> could change, with zero change in underlying reality.</p>
+<blockquote>
+<p>If you designed a real study on this question: what exposure variable, at what spatial <em>and temporal</em> resolution, would you actually want?</p>
+</blockquote>
 </section>
+<section class="slide level2">
 
+</section></section>
 <section>
-<section id="wrap-up-taking-this-back-to-your-own-research" class="title-slide slide level1 center">
-<h1>Wrap-up: taking this back to your own research</h1>
-<p>A few closing questions to carry out of the room:</p>
+<section id="wrap-up" class="title-slide slide level1 center">
+<h1>Wrap-up</h1>
+
+</section>
+<section id="carry-these-questions-out-of-the-room" class="slide level2 smaller">
+<h2>Carry these questions out of the room</h2>
 <ul>
-<li>Everything today used pre-aggregated, area-level administrative data. What would change in this workflow if you instead had <strong>point-level</strong> data — patient addresses, well locations, facility coordinates? (Think about buffers, distance-to-nearest-source, and kernel density instead of choropleths.)</li>
-<li>Where in your own work do you currently use a “zone” (ZIP code, county, census tract, state) mostly because it’s the unit your data happens to come in, rather than because it’s the right scale for the exposure mechanism you care about?</li>
-<li>Surveillance effort bias showed up clearly in Parts 5-7. Where might it be hiding, less visibly, in a dataset you already use?</li>
+<li>Everything today was area-level, pre-aggregated data. What changes with <strong>point-level</strong> data (addresses, wells, facilities)? Think buffers, distance-to-source, kernel density.</li>
+<li>Where do <em>you</em> use a “zone” (ZIP, county, tract, state) just because that’s the unit your data comes in — not because it’s the right scale for the exposure mechanism?</li>
+<li>Surveillance-effort bias showed up clearly today. Where might it be hiding, less visibly, in a dataset you already use?</li>
 </ul>
 </section>
-<section id="where-to-go-next-spatial-clustering" class="slide level2">
-<h2>Where to go next: spatial clustering</h2>
-<p>Today’s exercise stopped at “here’s the pattern, and here’s why you should be cautious about it.” A natural next question — is a pattern you can <em>see</em> on a map actually clustered more than chance would produce? — is answered with spatial autocorrelation statistics (global and local Moran’s I, using the <code>spdep</code> package). That’s a self-contained follow-on exercise, deliberately not covered today so we could spend the time on these more foundational skills. Ask your instructors for it if you want to keep going on your own after the course.</p>
-</section>
-<section id="further-resources" class="slide level2">
-<h2>Further resources</h2>
+<section id="where-to-go-next" class="slide level2 smaller">
+<h2>Where to go next</h2>
+<p>Today stopped at “here’s the pattern, here’s why to be cautious.” The natural next question — is a visible pattern <em>actually</em> clustered more than chance? — is spatial autocorrelation (Moran’s I / LISA, via <code>spdep</code>). Self-study follow-on, not covered today.</p>
+<p><strong>Further resources</strong></p>
 <ul>
-<li>Pebesma &amp; Bivand, <em>Spatial Data Science</em> (free online) — the standard modern reference for <code>sf</code></li>
-<li><code>tigris</code> documentation for other Census geographies (counties, ZCTAs, tracts) — the natural next step beyond state-level analysis</li>
-<li><code>spdep</code> package vignettes, if/when you pick up the spatial clustering follow-on exercise above</li>
+<li>Pebesma &amp; Bivand, <em>Spatial Data Science</em> (free online)</li>
+<li><code>tigris</code> docs — other Census geographies (counties, ZCTAs, tracts)</li>
+<li><code>spdep</code> vignettes, for the follow-on exercise</li>
 </ul>
 
 </section></section>
@@ -820,7 +832,7 @@ sample estimates:
         progress: true,
 
         // Display the page number of the current slide
-        slideNumber: false,
+        slideNumber: 'c/t',
 
         // 'all', 'print', or 'speaker'
         showSlideNumber: 'all',
