@@ -1,0 +1,726 @@
+---
+title: "Mapping Antimicrobial Resistance Across U.S. States"
+subtitle: "An Introduction to GIS Methods for Environmental Pharmacoepidemiology"
+author: "ISPE 2026 Pre-Conference Course"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 5.5)
+```
+
+
+# Welcome
+
+We are going to build a complete GIS workflow in R, using real
+CDC surveillance data:
+
+1.  **`ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv`** — the percent
+    of multidrug-resistant (MDR) *E. coli* isolates among
+    healthcare-associated infections, by state, from CDC's Antibiotic
+    Resistance & Patient Safety Portal (ARPSP), 2024. 
+2.  **`BEAM_Dashboard_-_Report_Data_20260804.csv`** — CDC enteric
+    bacteria surveillance isolates (Salmonella, *E. coli*/STEC,
+    Campylobacter, Shigella, Vibrio) drawn from animal, food, human, and
+    **environmental** sources, reported monthly since 2018. We will use
+    the environmental-source *Salmonella* records as a proxy **exposure
+    / surveillance-effort**.
+3.  **`2024-SIR-ACH.xlsx`** — CDC NHSN Standardized Infection Ratio
+    (SIR) report for acute care hospitals, 2024. You will use this
+    yourself in Part 8.
+
+None of these files contain a shapefile, a latitude, or a longitude.
+That is deliberate. Most pharmacoepidemiology environmental exposure
+data you will encounter in practice — surveillance reports, claims data
+aggregated for privacy, vital statistics — arrives as **tables tied to
+an administrative area** (state, county, ZIP) **and to a time period**
+(month, year).
+
+## Learning objectives
+
+By the end, you will be able to:
+
+- Import and clean real, messy public-health surveillance data in R
+- Obtain U.S. state boundary polygons and understand what a coordinate
+  reference system (CRS) is doing for you
+- Perform an **attribute join** — attaching non-spatial data to spatial
+  geometry by a shared key — the single most common GIS operation you
+  will do in this field
+- Build choropleth (thematic) maps with `ggplot2` + `sf`
+- Build **small-multiples map panels** to show how a distribution
+  changes across years and across seasons, and understand why the color
+  scale has to be shared across panels for the comparison to be fair
+- Recognize **seasonality** in area-level surveillance data using both a
+  simple distribution plot and a mapped version of the same pattern
+- Name the specific ways area-level GIS analysis can mislead you in
+  environmental pharmacoepidemiology (MAUP, ecological fallacy,
+  surveillance effort bias) — and recognize them in your own results
+
+------------------------------------------------------------------------
+
+# Setup
+
+```{r install-packages, eval=FALSE}
+# Run once. Skip if already installed.
+install.packages(c("sf", "tigris", "dplyr", "tidyr", "readr", "readxl",
+                    "janitor", "ggplot2", "viridis", "scales"))
+```
+
+```{r load-packages}
+library(sf)        # spatial vector data: geometry + attributes
+library(tigris)     # download US Census boundary files
+library(dplyr)       # data wrangling
+library(tidyr)         # expand_grid(), for building complete state x time panels
+library(readr)          # fast, sane CSV reading
+library(readxl)           # read Excel sheets
+library(janitor)           # clean up ugly column names
+library(ggplot2)             # mapping and plotting
+library(viridis)               # colorblind-safe palettes
+library(scales)                  # nicer plot labels
+
+options(tigris_use_cache = TRUE)   # cache downloaded shapefiles locally
+sf::sf_use_s2(TRUE)                 # spherical geometry engine (default, just being explicit)
+```
+
+> **Teaching note:** `tigris` downloads boundary files from the U.S.
+> Census Bureau the first time you use them, then caches them on disk.
+> If you are offline, use the pre-downloaded
+> `states_sf.rds` file and load it with
+> `states_sf <- readRDS("states_sf.rds")` instead of running the
+> `tigris::states()` call below.
+
+------------------------------------------------------------------------
+
+# Part 1 — Import and clean the tabular data
+
+## 1a. Clinical outcome: MDR *E. coli* resistance by state
+
+```{r import-arpsp}
+ecoli_raw <- read_csv("../data/ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv")
+
+ecoli <- ecoli_raw %>%
+  clean_names() %>%                 # tidies "Percent Resistant" -> percent_resistant
+  select(state, percent_resistant) %>%
+  mutate(percent_resistant = as.numeric(percent_resistant))
+
+glimpse(ecoli)
+```
+
+**Stop and look.** How many rows do you have? Is that one row per U.S.
+state? (Hint: `nrow(ecoli)`; check whether Puerto Rico and DC are
+included with `unique(ecoli$state)`.) Knowing your unit of observation
+*before* you map it is a GIS habit, as it will help you
+determine what your eventual polygon layer needs to contain. 
+
+## 1b. Environmental exposure signal: BEAM environmental isolates by state
+
+The raw BEAM file is semicolon-delimited and has a European-style
+thousands separator in the `Year` column (e.g. `"2,024"`). This is
+completely typical of real surveillance exports.
+
+```{r import-beam}
+beam_raw <- read_delim("../data/BEAM_Dashboard_-_Report_Data_20260804.csv",
+                        delim = ";", show_col_types = FALSE)
+
+beam <- beam_raw %>%
+  clean_names() %>%
+  mutate(year = as.numeric(gsub(",", "", year)))
+
+# Keep only environmental-source Salmonella isolates from 2024, as a
+# first, simple look -- one state, one year, one map.
+beam_env_2024 <- beam %>%
+  filter(year == 2024, source_type == "Environment", pathogen == "Salmonella")
+
+# The "state" column has some junk values in it (data-entry artifacts like
+# "N/", "US", "OU"). A real GIS key needs to be *valid* before you can join
+# on it -- always sanity-check your join key.
+valid_state_codes <- c(state.abb, "DC")   # state.abb is a built-in R constant
+sort(unique(beam_env_2024$state))
+```
+
+```{r clean-beam}
+beam_env_clean <- beam_env_2024 %>%
+  filter(state %in% valid_state_codes) %>%
+  group_by(state) %>%
+  summarize(env_isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+beam_env_clean
+```
+
+**Discussion:** Only about 20 states show up here at all, for 2024 alone.
+Is that because *Salmonella* genuinely isn't present in the environment
+elsewhere — or because those states simply aren't sampling environmental
+sources? Hold onto that question; we'll come back to it, with more data
+behind us, in Parts 5-7. In environmental pharmacoepidemiology, an
+"exposure" layer built from surveillance data is never just measuring
+exposure — it's also measuring *where people looked.* 
+
+**Sampling choices**
+
+
+------------------------------------------------------------------------
+
+# Part 2 — Get the map: state boundary polygons
+
+```{r get-states}
+states_sf <- tigris::states(cb = TRUE, resolution = "20m", year = 2022)
+
+states_sf <- states_sf %>%
+  clean_names() %>%
+  select(name, stusps, geoid, geometry)
+
+glimpse(states_sf)
+```
+
+`states_sf` is an `sf` object: an ordinary data frame with one extra
+column, `geometry`, holding the polygon boundary for each state.
+Everything you already know about `dplyr::filter()`, `mutate()`, and
+`left_join()` still works!!.
+
+```{r plot-blank-map}
+ggplot(states_sf) +
+  geom_sf() +
+  theme_minimal() +
+  labs(title = "U.S. state boundaries (no data joined yet)")
+```
+
+For the rest of this exercise we'll restrict to the contiguous 48
+states + DC. Alaska, Hawaii, Puerto Rico, and the outlying territories
+are real and important, but they sit far outside the CONUS bounding box
+and would either get cut off or force us to shrink every other state to
+fit them on the same simple map. (`tigris::shift_geometry()` can
+reposition them into inset boxes if you need a true all-50-states map
+later — worth knowing exists, out of scope for today.) For a first pass
+at small-multiples mapping, keeping the geography simple lets us focus
+on the actual skill: comparing panels to each other.
+
+```{r conus-only}
+conus_codes <- setdiff(c(state.abb, "DC"), c("AK", "HI"))
+
+states_conus <- states_sf %>%
+  filter(stusps %in% conus_codes) %>%
+  st_transform(5070)   # Albers Equal Area Conic — standard projected CRS for CONUS
+```
+
+> **CRS check-in.** `tigris` gives you data in geographic coordinates
+> (NAD83, unprojected — degrees of latitude/longitude). We just
+> projected to EPSG:5070, an *equal-area* projection built for the
+> contiguous U.S. Projection matters here for two concrete reasons: (1)
+> `ggplot2` will draw a nicer, less distorted map, and (2) any analysis
+> that depends on area or distance (which ours doesn't today, but often
+> will) requires a projected CRS to be correct. Always ask "what CRS is
+> this in, and does that CRS make sense for what I'm about to compute?"
+
+------------------------------------------------------------------------
+
+# Part 3 — Attribute join
+
+This is the step that turns a spreadsheet into a map. We attach our two
+non-spatial tables to `states_conus` by matching a shared key: full
+state name for the ARPSP data, two-letter abbreviation for the BEAM
+data.
+
+```{r attribute-join}
+map_data <- states_conus %>%
+  left_join(ecoli, by = c("name" = "state")) %>%
+  left_join(beam_env_clean, by = c("stusps" = "state")) %>%
+  mutate(env_isolates = coalesce(env_isolates, 0))  # no report = 0 isolates, not missing
+
+summary(map_data$percent_resistant)
+summary(map_data$env_isolates)
+```
+
+**Stop and check your join.** A silent join failure — rows that should
+have matched but didn't, because of a trailing space, a "St." vs
+"Saint", a different case — is the single most common source of a blank
+or wrong-looking choropleth map. Before you ever trust a joined map,
+run:
+
+```{r check-join}
+map_data %>%
+  st_drop_geometry() %>%
+  filter(is.na(percent_resistant)) %>%
+  select(name, stusps)
+```
+
+If that returns states you *expected* to have data, go back and find the
+mismatch. If it's empty, your join key worked.
+
+------------------------------------------------------------------------
+
+# Part 4 — Your first choropleth maps
+
+```{r choropleth-ecoli}
+# MAP 1 -- BAD: a qualitative (non-ordered) palette forced onto ordered data.
+# Set1's colors have no natural low-to-high sequence -- red isn't obviously
+# "more resistant" than blue or green, so the reader has to keep re-checking
+# the legend instead of reading the map at a glance. Also rough for
+# colorblind readers (red/green together).
+map_data_bad <- map_data %>%
+  mutate(resist_bin = cut(percent_resistant,
+                           breaks = c(0, 5, 10, 15, 25),
+                           labels = c("0-4%", "5-9%", "10-14%", "15%+"),
+                           include.lowest = TRUE))
+
+ggplot(map_data_bad) +
+  geom_sf(aes(fill = resist_bin), color = "white", linewidth = 0.15) +
+  scale_fill_brewer(palette = "Set1", name = "% MDR\nE. coli") +
+  theme_void() +
+  labs(title = "Multidrug-resistant E. coli among HAIs, by state, 2024",
+       subtitle = "BAD: a qualitative palette on ordered data",
+       caption = "Source: ARPSP")
+
+ 
+# MAP 2 -- NOT SO GREAT: right idea (sequential yellow-to-red), wrong bins.
+# These are naive round-number "percent" buckets (0-19, 20-39, ...) instead
+# of bins built from the data's actual range. Real values only go up to
+# ~25%, so almost every state falls into the first bucket and the map goes
+# nearly flat -- you lose almost all the variation you're trying to show.
+map_data_meh <- map_data %>%
+  mutate(resist_bin = cut(percent_resistant,
+                           breaks = c(0, 20, 40, 60, 80, 100),
+                           labels = c("0-10%", "10-19%", "20-39%", "40-59%", "60-100%"),
+                           include.lowest = TRUE))
+
+ggplot(map_data_meh) +
+  geom_sf(aes(fill = resist_bin), color = "white", linewidth = 0.15) +
+  scale_fill_manual(values = c("0-10%" = "#FFFFB2", "10-19%" = "#FECC5C",
+                                "20-39%" = "#FD8D3C", "40-59%" = "#F03B20",
+                                "60-100%" = "#BD0026"),
+                     name = "% MDR\nE. coli", drop = FALSE) +
+  theme_void() +
+  labs(title = "Multidrug-resistant E. coli among HAIs, by state, 2024",
+       subtitle = "NOT SO GREAT: sequential color, but bins don't match the data",
+       caption = "Source: ARPSP")
+
+# GREAT, classed version: quantile breaks so every bin has roughly the same
+# number of states (no bin swallows the whole map, unlike Map 2's round
+# numbers) + a red-toned sequential palette.
+quantile_breaks <- quantile(map_data$percent_resistant, probs = seq(0, 1, 0.2), na.rm = TRUE)
+
+map_data_great <- map_data %>%
+  mutate(resist_bin = cut(percent_resistant, breaks = quantile_breaks,
+                           include.lowest = TRUE,
+                           labels = c("Lowest 20%", "2nd", "3rd", "4th", "Highest 20%")))
+
+ggplot(map_data_great) +
+  geom_sf(aes(fill = resist_bin), color = "white", linewidth = 0.15) +
+  scale_fill_brewer(palette = "YlOrRd", name = "% MDR\nE. coli\n(quintile)") +
+  theme_void() +
+  labs(title = "Multidrug-resistant E. coli among HAIs, by state, 2024",
+       subtitle = "GREAT: classed, quantile breaks, red = higher resistance",
+       caption = "Source: ARPSP")
+
+
+ggplot(map_data) +
+  geom_sf(aes(fill = percent_resistant), color = "white", linewidth = 0.15) +
+  scale_fill_distiller(palette = "YlOrRd", direction = 1, name = "% MDR\nE. coli") +
+  theme_void() +
+  labs(title = "Multidrug-resistant E. coli among HAIs, by state, 2024",
+       subtitle = "GREAT: continuous, red = higher resistance",
+       caption = "Source: ARPSP")
+
+```
+
+```{r choropleth-beam}
+
+
+ggplot(map_data) +
+  geom_sf(aes(fill = env_isolates), color = "white", linewidth = 0.15) +
+  scale_fill_viridis_c(name = "Environmental\nSalmonella\nisolates", option = "viridis") +
+  theme_void() +
+  labs(title = "Environmentally-sourced Salmonella isolates, by state, 2024",
+       subtitle = "CDC BEAM enteric bacteria surveillance",
+       caption = "Source: BEAM Dashboard")
+
+ggplot(map_data) +
+  geom_sf(aes(fill = env_isolates), color = "white", linewidth = 0.15) +
+  scale_fill_distiller(palette = "YlOrRd", direction = 1, name = "% MDR\nSalmonella") +
+  theme_void() +
+  labs(title = "Environmentally-sourced Salmonella isolates, by state, 2024",
+       subtitle = "CDC BEAM enteric bacteria surveillance",
+       caption = "Source: BEAM Dashboard")
+
+```
+
+**Discussion prompts:**
+
+1.  `scale_fill_viridis_c()` uses a *continuous* color gradient. What
+    would change if you binned this into 4-5 categories instead
+    (`scale_fill_viridis_b()`)? What decision are you making implicitly
+    when you choose bin breaks (equal interval vs. quantile vs. Jenks
+    natural breaks)? This is not a cosmetic choice — bin choice can
+    visually create or hide a "hot spot."
+2.  Look at the second map. Does it look like a map of environmental
+    *Salmonella* contamination, or a map of *where states happened to
+    test environmental samples*? 
+
+## A note on missing data before we go further
+
+Run `summary(map_data$percent_resistant)` again and look for `NA's`. One
+state — Wyoming — has a missing value in the ARPSP source data
+(not a join error). Small states often have their rates **suppressed**
+in public surveillance data when the underlying case count is too small
+to report reliably without a risk of re-identifying a patient. This is a
+real and recurring feature of small-area public health data, not a
+data-cleaning mistake to hide.
+
+```{r drop-missing}
+map_data %>% st_drop_geometry() %>% filter(is.na(percent_resistant)) %>% select(name)
+
+map_data <- map_data %>% filter(!is.na(percent_resistant))
+nrow(map_data)   # 48 states remain
+```
+
+**Discussion:** dropping is not the only option — you could instead
+impute Wyoming's value (e.g., a regional mean), but imputation should be
+a deliberate, documented choice.
+
+------------------------------------------------------------------------
+
+# Part 5 — Expanding across years: small multiples of environmental surveillance
+
+A single choropleth is a snapshot. Most of the interesting questions in
+environmental pharmacoepidemiology are about *change* — did something
+increase, decrease, or stay flat? The standard way to show that
+spatially is a **small-multiples panel**: the same map, repeated once
+per time period, laid out in a grid so the eye can compare them directly.
+
+Let's rebuild the BEAM environmental *Salmonella* extract, this time
+keeping every full year from 2018 through 2025 (we'll drop 2026 — it's
+only partially reported as of today, and a partial year next to eight
+full years would make the most recent panel look like a decline that
+isn't real).
+
+```{r beam-multiyear}
+beam_env_years <- beam %>%
+  filter(source_type == "Environment", pathogen == "Salmonella",
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(state, year) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+```
+
+Every CONUS state should get one row for *every* year, even the years it
+reported nothing — an absent row and a reported zero mean different
+things once you're building a panel, and only one of them is correct
+here.
+
+```{r beam-panel-grid}
+beam_panel <- expand_grid(
+  stusps = states_conus$stusps,
+  year   = 2018:2025
+) %>%
+  left_join(beam_env_years, by = c("stusps" = "state", "year")) %>%
+  mutate(isolates = coalesce(isolates, 0))
+
+nrow(beam_panel)   # 49 states x 8 years
+```
+
+```{r panel-join-map}
+panel_sf <- states_conus %>%
+  select(stusps, name, geometry) %>%
+  left_join(beam_panel, by = "stusps")
+```
+
+```{r facet-years, fig.width=10, fig.height=6}
+ggplot(panel_sf) +
+  geom_sf(aes(fill = isolates), color = "white", linewidth = 0.05) +
+  facet_wrap(~ year, ncol = 4) +
+  scale_fill_distiller(palette = "YlOrRd",  direction = 1, name = "Environmental\nSalmonella\nisolates",
+                        limits = c(0, max(panel_sf$isolates))) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold")) +
+  labs(title = "Environmentally-sourced Salmonella isolates by state, 2018-2025",
+       subtitle = "CDC BEAM enteric bacteria surveillance",
+       caption = "Source: BEAM Dashboard")
+```
+
+**Why the `limits = c(0, max(panel_sf$isolates))`** Every panel
+here shares one color scale, built from the range of *all eight years
+combined*. If you instead mapped each year separately with its own
+default scale, a state with 5 isolates in a low year could look just as
+"dark" as a state with 50 isolates in a high year — same color, wildly
+different magnitude. A shared scale is what makes a small-multiples
+panel an honest comparison instead of eight unrelated pictures that
+happen to share an axis. This is arguably the single most common way
+choropleth series mislead a reader, and it's a one-line fix.
+
+**Discussion prompts:**
+
+1.  Which one or two states look like they're driving most of the
+    signal across the panel? Pull up their individual year-by-year
+    isolate counts and check your visual read against the numbers.
+2.  Do any years look like a sharp jump or drop for many states at once
+    (rather than one state)? A change that shows up broadly, in the same
+    year, across unrelated states, is more likely a **reporting or
+    methods change** than eight independent outbreaks.
+3.  Go back to your answer from Part 4, question 2. Now that you can see
+    which states report *consistently* across all eight years versus
+    which show up once or twice — does that change your read on whether
+    this layer measures contamination, testing effort, or some mix of
+    both?
+
+# Total Salmonella isolates by source type, 2018-2025 pooled -- look at the
+# scale of the imbalance before you try to map it.
+```{r facet}
+salm_source_totals <- beam %>%
+  filter(pathogen == "Salmonella", year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(source_type) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop") %>%
+  arrange(desc(isolates))
+
+salm_source_totals
+
+ggplot(salm_source_totals, aes(x = reorder(source_type, isolates), y = isolates)) +
+  geom_col(fill = "#440154FF") +
+  coord_flip() +
+  scale_y_continuous(labels = comma) +
+  labs(x = NULL, y = "Total Salmonella isolates, 2018-2025 (log10 axis)",
+       title = "Salmonella isolates by source type") +
+  scale_y_log10(labels = comma) +
+  theme_minimal()
+```
+
+# State x source-type panel, same zero-fill logic as Parts 5-6.
+```{r facet2}
+salm_by_source <- beam %>%
+  filter(pathogen == "Salmonella", year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(state, source_type) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+source_types <- c("Environment", "Animal", "Food", "Human")
+
+salm_source_panel <- expand_grid(stusps = states_conus$stusps, source_type = source_types) %>%
+  left_join(salm_by_source, by = c("stusps" = "state", "source_type")) %>%
+  mutate(isolates = coalesce(isolates, 0),
+         source_type = factor(source_type, levels = source_types))
+
+salm_source_sf <- states_conus %>%
+  select(stusps, geometry) %>%
+  left_join(salm_source_panel, by = "stusps")
+
+# Raw counts on one shared scale would make Environment/Animal/Food look
+# essentially blank next to Human -- log10(isolates + 1) lets all four
+# panels show internal spatial variation at once. Note in the legend that
+# it's a log scale, NOT LINEAR
+ggplot(salm_source_sf) +
+  geom_sf(aes(fill = isolates), color = "white", linewidth = 0.05) +
+  facet_wrap(~ source_type, nrow = 1) +
+  scale_fill_distiller(palette = "YlOrRd",  direction = 1,
+                       name = "Salmonella\nisolates\n(log10 scale)",
+                        trans = "log1p",
+                        breaks = c(0, 10, 100, 1000, 10000)) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold")) +
+  labs(title = "Salmonella isolates by source type and state, 2018-2025 pooled",
+       subtitle = "CDC BEAM enteric bacteria surveillance",
+       caption = "Source: BEAM Dashboard. Color scale is log-transformed -- do not compare panels visually as if linear.")
+```
+------------------------------------------------------------------------
+
+# Part 6 — Is there a seasonal pattern?
+
+Small multiples don't have to be organized by year — the same technique
+works for any repeating unit of time. Here we'll look at *season*, using
+all eight years pooled together so each panel has enough data behind it
+to be worth looking at.
+
+## 6a. Start non-spatial: what does the distribution look like?
+
+Before mapping anything, look at the plain distribution. Pooling across
+2018-2025 gives us enough isolates per month to see a shape, where any
+single year would mostly be noise.
+
+```{r seasonality-national}
+monthly_totals <- beam %>%
+  filter(source_type == "Environment", pathogen == "Salmonella",
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(month) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+ggplot(monthly_totals, aes(x = factor(month), y = isolates)) +
+  geom_col(fill = "#21908CFF") +
+  scale_x_discrete(labels = month.abb) +
+  labs(x = NULL, y = "Total isolates, 2018-2025 pooled (all CONUS states)",
+       title = "Monthly distribution of environmental Salmonella isolates") +
+  theme_minimal()
+```
+
+**Discussion:** Does this look seasonal to you, or does it look close to
+flat with some noise? What would make you more confident either way —
+more years, more states, or something else?
+
+## 6b. Now map the same idea
+
+Group the same eight years of data into four seasons per state, so we
+can see whether the pattern in 6a is broadly shared across the country
+or driven by a handful of states.
+
+```{r seasonality-spatial}
+season_levels <- c("Winter (Dec-Feb)", "Spring (Mar-May)",
+                    "Summer (Jun-Aug)", "Fall (Sep-Nov)")
+
+beam_season <- beam %>%
+  filter(source_type == "Environment", pathogen == "Salmonella",
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  mutate(season = case_when(
+    month %in% c(12, 1, 2)  ~ "Winter (Dec-Feb)",
+    month %in% c(3, 4, 5)   ~ "Spring (Mar-May)",
+    month %in% c(6, 7, 8)   ~ "Summer (Jun-Aug)",
+    month %in% c(9, 10, 11) ~ "Fall (Sep-Nov)"
+  )) %>%
+  group_by(state, season) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+season_panel <- expand_grid(stusps = states_conus$stusps, season = season_levels) %>%
+  left_join(beam_season, by = c("stusps" = "state", "season")) %>%
+  mutate(isolates = coalesce(isolates, 0),
+         season = factor(season, levels = season_levels))
+
+season_sf <- states_conus %>%
+  select(stusps, geometry) %>%
+  left_join(season_panel, by = "stusps")
+```
+
+```{r facet-season-map, fig.width=10, fig.height=4}
+ggplot(season_sf) +
+  geom_sf(aes(fill = isolates), color = "white", linewidth = 0.05) +
+  facet_wrap(~ season, nrow = 1) +
+  scale_fill_distiller(palette = "YlOrRd",  direction = 1,
+                       name = "Environmental\nSalmonella\nisolates",
+                        limits = c(0, max(season_sf$isolates))) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold")) +
+  labs(title = "Environmental Salmonella isolates by season, 2018-2025 pooled",
+       subtitle = "CDC BEAM enteric bacteria surveillance",
+       caption = "Source: BEAM Dashboard")
+```
+
+**Discussion prompts:**
+
+1.  *Salmonella* survival and growth in water and soil is generally
+    understood to be temperature-dependent, which would predict a
+    warm-season peak. Does the summer panel support that here? Before
+    you answer yes, go back to the surveillance-effort caution from Part
+    1b and Part 5 — what competing explanation do you need to rule out
+    first?
+2.  Are the same states lighting up in Part 5's year panels and this
+    season panel? A state that's consistently high across all seasons is
+    telling you a different story than a state that's high in exactly
+    one season.
+3.  Why did we pool eight years into four seasons instead of mapping,
+    say, just August 2024 across all states? (Look back at how sparse
+    the single-year, single-month cells would have been.)
+
+------------------------------------------------------------------------
+
+# Part 7 — Linking the environmental signal to the clinical outcome
+
+Now the environmental pharmacoepi question: is a state's environmental
+surveillance signal for *Salmonella* associated with its clinical MDR
+*E. coli* burden? We'll use the full 2018-2025 total this time as we just saw in 
+parts 5-6 just  a single year can be noisy.
+
+```{r total-env-exposure}
+env_total <- beam_panel %>%
+  group_by(stusps) %>%
+  summarize(env_isolates_total = sum(isolates), .groups = "drop")
+
+sum(env_total$env_isolates_total == 0)   # states with zero isolates, 2018-2025 combined
+```
+
+```{r scatter}
+plot_df <- map_data %>%
+  st_drop_geometry() %>%
+  left_join(env_total, by = "stusps")
+
+ggplot(plot_df, aes(x = env_isolates_total, y = percent_resistant)) +
+  geom_point(size = 2, alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "firebrick") +
+  labs(x = "Environmental Salmonella isolates, 2018-2025 total",
+       y = "% MDR E. coli among HAIs, 2024",
+       title = "Multi-year environmental surveillance signal vs. clinical resistance burden") +
+  theme_minimal()
+
+cor.test(plot_df$env_isolates_total, plot_df$percent_resistant, method = "spearman")
+```
+
+**Discussion of the exercise. Work through it as a group.**
+
+1.  Is there a correlation? Is it what you expected? Compare the number
+    of zero-isolate states here (pooling eight years) to the single-year
+    2024 map from Part 4 — pooling helped, but did it fully solve the
+    surveillance-effort problem, or just shrink it?
+2.  This is still **surveillance/detection bias**: an "exposure" built
+    from surveillance counts is measuring exposure *and* testing effort
+    at the same time, and you generally can't fully separate the two
+    from counts alone.
+3.  Both variables here are aggregated to the *state* level, an
+    administrative boundary chosen for governance, not for epidemiology.
+    Two pieces of jargon worth knowing cold for this field:
+    - **Ecological fallacy**: even if the correlation above is real, it
+      tells you nothing about *individual* patients — you cannot
+      conclude that a specific person's resistant infection was caused
+      by environmental exposure just because their state shows an
+      association.
+    - **Modifiable Areal Unit Problem (MAUP)**: had we aggregated to
+      counties, HHS regions, or watersheds instead of states, both the
+      magnitude and even the direction of this relationship could
+      change, simply from redrawing the boundaries — with no change to
+      the underlying reality.
+4.  If you were designing a real study on this question, what exposure
+    variable would you actually want, and at what spatial *and temporal*
+    resolution?
+
+
+# Wrap-up: taking this back to your own research
+
+A few closing questions to carry out of the room:
+
+- Everything today used pre-aggregated, area-level administrative data.
+  What would change in this workflow if you instead had **point-level**
+  data — patient addresses, well locations, facility coordinates? (Think
+  about buffers, distance-to-nearest-source, and kernel density instead
+  of choropleths.)
+- Where in your own work do you currently use a "zone" (ZIP code,
+  county, census tract, state) mostly because it's the unit your data
+  happens to come in, rather than because it's the right scale for the
+  exposure mechanism you care about?
+- Surveillance effort bias showed up clearly in Parts 5-7. Where might it
+  be hiding, less visibly, in a dataset you already use?
+
+## Where to go next: spatial clustering
+
+Today's exercise stopped at "here's the pattern, and here's why you
+should be cautious about it." A natural next question — is a pattern you
+can *see* on a map actually clustered more than chance would produce? —
+is answered with spatial autocorrelation statistics (global and local
+Moran's I, using the `spdep` package). That's a self-contained follow-on
+exercise, deliberately not covered today so we could spend the time on
+these more foundational skills. Ask your instructors for it if you want
+to keep going on your own after the course.
+
+## Further resources
+
+- Pebesma & Bivand, *Spatial Data Science* (free online) — the standard
+  modern reference for `sf`
+- `tigris` documentation for other Census geographies (counties, ZCTAs,
+  tracts) — the natural next step beyond state-level analysis
+- `spdep` package vignettes, if/when you pick up the spatial clustering
+  follow-on exercise above
+
