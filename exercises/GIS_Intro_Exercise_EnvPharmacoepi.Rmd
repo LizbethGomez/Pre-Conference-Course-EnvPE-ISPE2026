@@ -173,7 +173,7 @@ exposure — it's also measuring *where people looked.*
 # Part 2 — Get the map: state boundary polygons
 
 ```{r get-states}
-states_sf <- tigris::states(cb = TRUE, resolution = "20m", year = 2022)
+states_sf <- tigris::states(cb = TRUE, resolution = "20m", year = 2025)
 
 states_sf <- states_sf %>%
   clean_names() %>%
@@ -186,6 +186,17 @@ glimpse(states_sf)
 column, `geometry`, holding the polygon boundary for each state.
 Everything you already know about `dplyr::filter()`, `mutate()`, and
 `left_join()` still works!!.
+ 
+Offline fallback: if tigris::states() times out or you have no internet,
+download the cb_2025_us_state_20m folder next to this .Rmd (or adjust the
+path below), then use this instead of the tigris::states() call.
+  states_sf <- sf::read_sf("cb_2025_us_state_20m/cb_2025_us_state_20m.shp")
+
+`states_sf <- states_sf %>%
+  clean_names() %>%
+  select(name, stusps, geoid, geometry)`
+
+`glimpse(states_sf)`
 
 ```{r plot-blank-map}
 ggplot(states_sf) +

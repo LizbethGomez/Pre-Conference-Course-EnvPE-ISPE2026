@@ -1,0 +1,284 @@
+---
+title: "ANSWER KEY: Mapping Antimicrobial Resistance Across U.S. States"
+subtitle: "An Introduction to GIS Methods for Environmental Pharmacoepidemiology"
+author: "ISPE 2026 Pre-Conference Course"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: flatly
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE, fig.width = 8, fig.height = 5.5)
+```
+
+> **Depends on the main exercise.** This file's answer-key chunks
+> (`answer-key-panel`, `answer-key-season`, etc.) reuse `beam`,
+> `states_conus`, and `valid_state_codes` from
+> `exercises/GIS_Intro_Exercise_EnvPharmacoepi.Rmd` — they aren't
+> reloaded here. Run the main exercise first in the same R session (or
+> `source()` it) before running or knitting this file on its own.
+
+------------------------------------------------------------------------
+
+# Part 8 — Your turn: independent practice
+
+Two parts here. First, a quick recap of the join-and-map workflow on a
+new file. Second, and more importantly, you'll build your own
+small-multiples panels — the core new skill from today — on a different
+slice of the BEAM data.
+
+## 8.1 Quick recap: import and map the MRSA SIR data
+
+Use **Table 7 (state-level hospital-onset MRSA bacteremia SIRs)** from
+`2024-SIR-ACH.xlsx`.
+
+The sheet has a multi-row title block above the real header row — this
+is extremely common in Excel reports designed to be read by humans, not
+software. Use `readxl::read_excel()` and skip past the title rows so
+that the row containing "State", "SIR", etc. becomes your header.
+
+```{r your-turn-import, eval=FALSE}
+mrsa_raw <- read_excel("../data/2024-SIR-ACH.xlsx",
+                        sheet = "Table 7-State MRSA Data",
+                        skip = ____)   # how many rows do you need to skip?
+
+mrsa <- mrsa_raw %>%
+  clean_names() %>%
+  select(state, sir) %>%
+  mutate(sir = suppressWarnings(as.numeric(sir))) %>%
+  filter(!is.na(state), state != "____")   # there's a US-total summary row at the bottom -- what is it called?
+```
+
+**Look closely at `unique(mrsa$state)` before you join.** Different CDC
+data products don't always spell the same state the same way — this
+table uses `"D.C."`, while `tigris` (and the ARPSP file you used
+earlier) use `"District of Columbia"`. A join is only as good as its
+key, so fix any mismatches you find *before* joining, e.g.:
+
+```{r your-turn-recode, eval=FALSE}
+mrsa <- mrsa %>%
+  mutate(state = recode(state, "____" = "District of Columbia"))
+```
+
+```{r your-turn-join, eval=FALSE}
+mrsa_map <- states_conus %>%
+  left_join(mrsa, by = c("____" = "____"))   # which key matches full state names?
+```
+
+Check the join the same way we did in Part 3 — did any states fail to
+match? If `sir` still has an `NA` in it once the join looks clean, that's
+not a join problem — it's a **suppressed value**, exactly like Wyoming
+in Part 4. Decide, and state explicitly, whether you'd drop or impute
+it.
+
+```{r your-turn-map, eval=FALSE}
+ggplot(mrsa_map) +
+  geom_sf(aes(fill = ____)) +
+  scale_fill_viridis_c(name = "MRSA SIR", option = "____", direction = ____) +
+  theme_void() +
+  labs(title = "____")
+```
+
+## 8.2 Build your own small-multiples panel
+
+Pick a **pathogen** and a **source type** from the BEAM data that we
+*haven't* used yet — anything other than Environment + Salmonella. Try
+`unique(beam$pathogen)` and `unique(beam$source_type)` if you want
+options. Food-sourced Campylobacter and Animal-sourced Salmonella are
+both good choices with plenty of data behind them.
+
+**Step 1 — a year panel**, following the exact pattern from Part 5:
+
+```{r your-turn-panel, eval=FALSE}
+my_pathogen    <- "____"
+my_source_type <- "____"
+
+my_panel <- beam %>%
+  filter(source_type == my_source_type, pathogen == my_pathogen,
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(state, ____) %>%                          # group by what, this time?
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+my_grid <- expand_grid(stusps = states_conus$stusps, year = 2018:2025) %>%
+  left_join(my_panel, by = c("stusps" = "state", "year")) %>%
+  mutate(isolates = coalesce(isolates, ____))         # fill missing with what?
+
+my_panel_sf <- states_conus %>%
+  select(stusps, geometry) %>%
+  left_join(my_grid, by = "stusps")
+
+ggplot(my_panel_sf) +
+  geom_sf(aes(fill = ____), color = "white", linewidth = 0.05) +
+  facet_wrap(~ ____, ncol = 4) +
+  scale_fill_viridis_c(limits = c(0, max(my_panel_sf$isolates))) +
+  theme_void() +
+  labs(title = "____")
+```
+
+**Step 2 — a season panel**, following the exact pattern from Part 6.
+Reuse the `case_when()` month groupings from Part 6b, then build the
+grid, join, and facet map yourself from scratch — you have the full
+pattern twice now (year panel above, season panel in Part 6).
+
+## 8.3 Interpret
+
+Answer in a sentence or two each:
+
+- Compared to our Environment + Salmonella example, does your
+  pathogen/source combination look *denser* (more states, more isolates
+  per state) or *sparser*? Which source types in BEAM are sampled far
+  more heavily than others, and what does that imply about comparing
+  "environment" numbers to "food" or "animal" numbers head to head?
+- Does your panel show a clearer year-to-year trend, a clearer seasonal
+  pattern, both, or neither? What's one non-biological explanation you'd
+  want to rule out before trusting either pattern?
+- If a colleague showed you one of these small-multiples panels without
+  telling you it used a shared color scale, and you found out later it
+  hadn't — how would that change what conclusions you'd trust from it?
+
+------------------------------------------------------------------------
+------------------------------------------------------------------------
+
+```{=html}
+<!-- =====================================================================
+ANSWER KEY -- Part 8
+===================================================================== -->
+```
+
+# Instructor answer key (Part 8)
+
+## 8.1 answer key
+
+```{r answer-key-import}
+mrsa_raw <- read_excel("../data/2024-SIR-ACH.xlsx",
+                        sheet = "Table 7-State MRSA Data",
+                        skip = 4)
+
+mrsa <- mrsa_raw %>%
+  clean_names() %>%
+  select(state, sir) %>%
+  mutate(sir = suppressWarnings(as.numeric(sir))) %>%
+  filter(!is.na(state), state != "All US") %>%
+  # tigris/ARPSP use "District of Columbia"; this sheet uses "D.C." -- fix
+  # the key before joining, or DC will silently fail to match.
+  mutate(state = recode(state, "D.C." = "District of Columbia"))
+```
+
+```{r answer-key-join}
+mrsa_map <- states_conus %>%
+  left_join(mrsa, by = c("name" = "state"))
+
+mrsa_map %>% st_drop_geometry() %>% filter(is.na(sir)) %>% select(name)
+```
+
+Guam and the Virgin Islands report `sir = "."` (suppressed) in the
+source sheet, but since they aren't part of `states_conus` to begin
+with, they never enter `mrsa_map` — nothing to clean up there. The join
+check above should come back empty once the DC recode is in place.
+
+```{r answer-key-map}
+ggplot(mrsa_map) +
+  geom_sf(aes(fill = sir), color = "white", linewidth = 0.15) +
+  scale_fill_viridis_c(name = "MRSA SIR", option = "magma", direction = -1) +
+  theme_void() +
+  labs(title = "Hospital-onset MRSA bacteremia SIR by state, 2024 NHSN")
+```
+
+## 8.2 answer key (worked with Campylobacter, Food source)
+
+```{r answer-key-panel, fig.width=10, fig.height=6}
+my_pathogen    <- "Campylobacter"
+my_source_type <- "Food"
+
+my_panel <- beam %>%
+  filter(source_type == my_source_type, pathogen == my_pathogen,
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  group_by(state, year) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+my_grid <- expand_grid(stusps = states_conus$stusps, year = 2018:2025) %>%
+  left_join(my_panel, by = c("stusps" = "state", "year")) %>%
+  mutate(isolates = coalesce(isolates, 0))
+
+my_panel_sf <- states_conus %>%
+  select(stusps, geometry) %>%
+  left_join(my_grid, by = "stusps")
+
+ggplot(my_panel_sf) +
+  geom_sf(aes(fill = isolates), color = "white", linewidth = 0.05) +
+  facet_wrap(~ year, ncol = 4) +
+  scale_fill_viridis_c(name = "Food-sourced\nCampylobacter\nisolates",
+                        limits = c(0, max(my_panel_sf$isolates))) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold")) +
+  labs(title = "Food-sourced Campylobacter isolates by state, 2018-2025")
+```
+
+Food-sourced Campylobacter is a good contrast case: roughly 45-49 states
+report in every single year (vs. ~14-26 for Environment-sourced
+Salmonella), and annual totals run in the thousands rather than the
+hundreds. That density is exactly why food and animal surveillance
+streams are more often used as primary exposure variables in published
+work than environmental streams — not because the environmental pathway
+matters less biologically, but because the data are thinner.
+
+```{r answer-key-season, fig.width=10, fig.height=4}
+season_levels <- c("Winter (Dec-Feb)", "Spring (Mar-May)",
+                    "Summer (Jun-Aug)", "Fall (Sep-Nov)")
+
+my_season_data <- beam %>%
+  filter(source_type == my_source_type, pathogen == my_pathogen,
+         year >= 2018, year <= 2025,
+         state %in% valid_state_codes) %>%
+  mutate(season = case_when(
+    month %in% c(12, 1, 2)  ~ "Winter (Dec-Feb)",
+    month %in% c(3, 4, 5)   ~ "Spring (Mar-May)",
+    month %in% c(6, 7, 8)   ~ "Summer (Jun-Aug)",
+    month %in% c(9, 10, 11) ~ "Fall (Sep-Nov)"
+  )) %>%
+  group_by(state, season) %>%
+  summarize(isolates = sum(number_of_isolates, na.rm = TRUE), .groups = "drop")
+
+my_season_panel <- expand_grid(stusps = states_conus$stusps, season = season_levels) %>%
+  left_join(my_season_data, by = c("stusps" = "state", "season")) %>%
+  mutate(isolates = coalesce(isolates, 0),
+         season = factor(season, levels = season_levels))
+
+my_season_sf <- states_conus %>%
+  select(stusps, geometry) %>%
+  left_join(my_season_panel, by = "stusps")
+
+ggplot(my_season_sf) +
+  geom_sf(aes(fill = isolates), color = "white", linewidth = 0.05) +
+  facet_wrap(~ season, nrow = 1) +
+  scale_fill_viridis_c(name = "Food-sourced\nCampylobacter\nisolates",
+                        limits = c(0, max(my_season_sf$isolates))) +
+  theme_void(base_size = 9) +
+  theme(strip.text = element_text(face = "bold")) +
+  labs(title = "Food-sourced Campylobacter isolates by season, 2018-2025 pooled")
+```
+
+National monthly totals for this combination run from about 2,250 (Feb)
+to about 3,240 (Jun) — a modest but real-looking early-summer bump,
+plausible for a foodborne pathogen tied to warm-weather food handling
+and outdoor eating, and visibly less driven by a handful of outlier
+states than the Environment + Salmonella example, precisely because the
+underlying counts are so much larger.
+
+**Interpretation talking points for 8.3:** the biggest single lesson to
+draw out here is that BEAM's four source types (Animal, Food, Human,
+Environment) are not equally sampled, and a denser stream will always
+look "smoother" and more confidently seasonal than a sparse one even if
+the true underlying biology were identical — surveillance intensity is a
+feature of the data-generating process, not of the exposure itself, and
+it has to be reasoned about explicitly rather than read off the map.

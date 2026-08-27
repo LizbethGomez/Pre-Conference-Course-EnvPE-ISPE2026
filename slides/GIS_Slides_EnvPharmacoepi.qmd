@@ -65,7 +65,7 @@ sf::sf_use_s2(TRUE)                 # spherical geometry engine (default, just b
 ## 1a. Clinical outcome: MDR *E. coli* resistance by state
 
 ```{r import-arpsp}
-ecoli_raw <- read_csv("ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv")
+ecoli_raw <- read_csv("../data/ARPSP_MDR-Ecoli---Percent-Resistant-in-2024.csv")
 
 ecoli <- ecoli_raw %>%
   clean_names() %>%                 # tidies "Percent Resistant" -> percent_resistant
@@ -82,7 +82,7 @@ glimpse(ecoli)
 The raw BEAM file is semicolon-delimited and has a European-style thousands separator in the `Year` column (e.g. `"2,024"`). This is completely typical of real surveillance exports.
 
 ```{r import-beam}
-beam_raw <- read_delim("BEAM_Dashboard_-_Report_Data_20260804.csv",
+beam_raw <- read_delim("../data/BEAM_Dashboard_-_Report_Data_20260804.csv",
                         delim = ";", show_col_types = FALSE)
 
 beam <- beam_raw %>%
