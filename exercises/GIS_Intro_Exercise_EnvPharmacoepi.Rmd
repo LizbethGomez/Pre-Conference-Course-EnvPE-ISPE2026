@@ -232,6 +232,12 @@ states_conus <- states_sf %>%
 > will) requires a projected CRS to be correct. Always ask "what CRS is
 > this in, and does that CRS make sense for what I'm about to compute?"
 
+> A flat map cannot perfectly represent the curved Earth. 
+ Choosing a standard CONUS coordinate system—most notably 
+the USA Contiguous Albers Equal Area Conic or 
+the Lambert Conformal Conic—drastically reduces visual and mathematical
+
+
 ------------------------------------------------------------------------
 
 # Part 3 — Attribute join
